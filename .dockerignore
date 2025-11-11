@@ -1,0 +1,9 @@
+.git
+.gitignore
+README.md
+img/
+*.md
+.direnv/
+.envrc
+flake.lock
+flake.nix

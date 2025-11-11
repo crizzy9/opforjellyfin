@@ -1,0 +1,9 @@
+- [x] Make it selfhostable
+- [x] build a UI
+- [x] Allow downloading via a torrent client
+- [ ] Download changes in the UI
+- [ ] Testing
+- [ ] Nixos based deployment
+- [ ] Strip the CLI functionality
+- [ ] Complementry updates based on other changes and user testing
+- [ ] Create a proper readme

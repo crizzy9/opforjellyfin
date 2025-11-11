@@ -1,0 +1,158 @@
+{{define "content"}}
+<div class="header">
+    <h1>Settings</h1>
+</div>
+
+<div class="card">
+    <h2 style="margin-bottom: 20px;">General Settings</h2>
+    <form hx-post="/api/settings/update" hx-target="#settings-alert" hx-swap="innerHTML">
+        <div class="form-group">
+            <label for="targetDir">Target Directory</label>
+            <input 
+                type="text" 
+                id="targetDir" 
+                name="targetDir" 
+                value="{{.Config.TargetDir}}"
+                placeholder="/media/One Piece/One Pace"
+                required
+            >
+            <small style="color: var(--secondary-text);">
+                Directory where One Pace episodes will be downloaded and organized
+            </small>
+        </div>
+
+        <button type="submit" class="btn btn-success">💾 Save Settings</button>
+    </form>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h2 style="margin-bottom: 20px;">Torrent Client Settings</h2>
+    <form hx-post="/api/settings/update" hx-target="#client-alert" hx-swap="innerHTML">
+        <div class="form-group">
+            <label for="clientType">Client Type</label>
+            <select id="clientType" name="clientType">
+                <option value="internal" {{if or (eq .Config.TorrentClient.Type "") (eq .Config.TorrentClient.Type "internal")}}selected{{end}}>Internal Client</option>
+                <option value="qbittorrent" {{if eq .Config.TorrentClient.Type "qbittorrent"}}selected{{end}}>qBittorrent</option>
+                <option value="deluge" {{if eq .Config.TorrentClient.Type "deluge"}}selected{{end}}>Deluge</option>
+                <option value="transmission" {{if eq .Config.TorrentClient.Type "transmission"}}selected{{end}}>Transmission</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="clientUrl">Client URL</label>
+            <input 
+                type="text" 
+                id="clientUrl" 
+                name="clientUrl" 
+                value="{{.Config.TorrentClient.URL}}"
+                placeholder="http://localhost:8080"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="clientUsername">Username</label>
+            <input 
+                type="text" 
+                id="clientUsername" 
+                name="clientUsername" 
+                value="{{.Config.TorrentClient.Username}}"
+                placeholder="admin"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="clientPassword">Password</label>
+            <input 
+                type="password" 
+                id="clientPassword" 
+                name="clientPassword"
+                value="{{.Config.TorrentClient.Password}}"
+            >
+            <small style="color: var(--secondary-text);">Leave blank to keep existing password</small>
+        </div>
+
+        <button 
+            type="button" 
+            class="btn" 
+            hx-post="/api/settings/test-client"
+            hx-target="#client-test-result"
+            hx-swap="innerHTML"
+        >
+            🧪 Test Connection
+        </button>
+        <button type="submit" class="btn btn-success">💾 Save Client Settings</button>
+        
+        <div id="client-test-result" style="margin-top: 15px;"></div>
+    </form>
+    
+    <div id="client-alert" style="margin-top: 20px;"></div>
+</div>
+
+<div id="settings-alert" style="margin-top: 20px;"></div>
+
+<script>
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if(evt.detail.target.id === 'settings-alert' || evt.detail.target.id === 'client-alert') {
+        try {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            if(data.success) {
+                evt.detail.target.innerHTML = `
+                    <div class="alert alert-success">
+                        ✅ ${data.message}
+                    </div>
+                `;
+            }
+        } catch(e) {
+            evt.detail.target.innerHTML = `
+                <div class="alert alert-danger">
+                    ❌ Failed to save settings
+                </div>
+            `;
+        }
+        
+        setTimeout(() => {
+            evt.detail.target.innerHTML = '';
+        }, 3000);
+    }
+    
+    if(evt.detail.target.id === 'client-test-result') {
+        try {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            if(data.success) {
+                evt.detail.target.innerHTML = `
+                    <div class="alert alert-success">
+                        ✅ ${data.message}
+                    </div>
+                `;
+            }
+        } catch(e) {
+            evt.detail.target.innerHTML = `
+                <div class="alert alert-danger">
+                    ❌ Connection test failed
+                </div>
+            `;
+        }
+        
+        setTimeout(() => {
+            evt.detail.target.innerHTML = '';
+        }, 5000);
+    }
+});
+
+document.body.addEventListener('htmx:responseError', function(evt) {
+    if(evt.detail.target.id === 'client-test-result') {
+        evt.detail.target.innerHTML = `
+            <div class="alert alert-danger">
+                ❌ ${evt.detail.xhr.responseText || 'Connection failed'}
+            </div>
+        `;
+        
+        setTimeout(() => {
+            evt.detail.target.innerHTML = '';
+        }, 5000);
+    }
+});
+</script>
+
+{{end}}
+{{template "base" .}}

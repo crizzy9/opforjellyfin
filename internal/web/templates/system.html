@@ -1,0 +1,103 @@
+{{define "content"}}
+<div class="header">
+    <h1>System</h1>
+</div>
+
+<div class="card">
+    <h2 style="margin-bottom: 20px;">Metadata Management</h2>
+    <p style="color: var(--secondary-text); margin-bottom: 20px;">
+        Sync metadata from the One Pace Jellyfin metadata repository. This updates episode information, 
+        artwork, and organizational data.
+    </p>
+    
+    <button 
+        class="btn btn-success" 
+        hx-post="/api/system/sync" 
+        hx-target="#sync-alert"
+        hx-swap="innerHTML"
+        onclick="this.disabled=true; this.innerHTML='⏳ Syncing...';"
+    >
+        🔄 Sync Metadata
+    </button>
+    
+    <div id="sync-alert" style="margin-top: 20px;"></div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h2 style="margin-bottom: 20px;">System Information</h2>
+    <table class="table">
+        <tbody>
+            <tr>
+                <td><strong>Version</strong></td>
+                <td>1.0.1</td>
+            </tr>
+            <tr>
+                <td><strong>Metadata Repository</strong></td>
+                <td>tissla/one-pace-jellyfin</td>
+            </tr>
+            <tr>
+                <td><strong>Download Method</strong></td>
+                <td>Internal BitTorrent Client</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h2 style="margin-bottom: 20px;">Logs</h2>
+    <div style="background-color: var(--primary-bg); padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto;">
+        <p style="color: var(--secondary-text);">Log viewing coming soon...</p>
+    </div>
+</div>
+
+<script>
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if(evt.detail.target.id === 'sync-alert') {
+        const button = document.querySelector('button[hx-post="/api/system/sync"]');
+        button.disabled = false;
+        button.innerHTML = '🔄 Sync Metadata';
+        
+        try {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            if(data.success) {
+                evt.detail.target.innerHTML = `
+                    <div class="alert alert-success">
+                        ✅ ${data.message}
+                    </div>
+                `;
+            }
+        } catch(e) {
+            evt.detail.target.innerHTML = `
+                <div class="alert alert-danger">
+                    ❌ Sync failed. Please check your settings and try again.
+                </div>
+            `;
+        }
+        
+        setTimeout(() => {
+            evt.detail.target.innerHTML = '';
+        }, 5000);
+    }
+});
+
+document.body.addEventListener('htmx:responseError', function(evt) {
+    if(evt.detail.target.id === 'sync-alert') {
+        const button = document.querySelector('button[hx-post="/api/system/sync"]');
+        button.disabled = false;
+        button.innerHTML = '🔄 Sync Metadata';
+        
+        evt.detail.target.innerHTML = `
+            <div class="alert alert-danger">
+                ❌ ${evt.detail.xhr.responseText || 'Sync failed. Please check your settings.'}
+            </div>
+        `;
+        
+        setTimeout(() => {
+            evt.detail.target.innerHTML = '';
+        }, 5000);
+    }
+});
+</script>
+
+{{end}}
+{{template "base" .}}

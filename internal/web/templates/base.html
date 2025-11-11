@@ -1,0 +1,38 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpforJellyfin - One Pace Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">🏴‍☠️ OpforJellyfin</div>
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/episodes" {{if eq .Page "episodes"}}class="active"{{end}}>📺 Episodes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/activity" {{if eq .Page "activity"}}class="active"{{end}}>📊 Activity</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" {{if eq .Page "settings"}}class="active"{{end}}>⚙️ Settings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/system" {{if eq .Page "system"}}class="active"{{end}}>🔧 System</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        <main class="main-content">
+            {{template "content" .}}
+        </main>
+    </div>
+</body>
+</html>
+{{end}}

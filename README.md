@@ -2,11 +2,53 @@
 
 ![OpforJellyfin-logo](img/opforjellyfin.png)
 
-CLI-tool to automate download and organisation of [One Pace](https://onepace.net) episodes for **Jellyfin**!
+**Automate download and organization of [One Pace](https://onepace.net) episodes for Jellyfin!**
 
-> ✨ Torrent downloads  
-> ✨ Placement after Jellyfin standards  
-> ✨ Matched to metadata shamelessly stolen from [SpykerNZ/one-pace-for-plex](https://github.com/SpykerNZ/one-pace-for-plex)
+> ✨ **Web UI** with Sonarr-like interface  
+> ✨ **External torrent clients** (qBittorrent, Deluge, Transmission)  
+> ✨ **CLI tools** for power users  
+> ✨ **Docker support** for easy self-hosting  
+> ✨ **Automatic file organization** with Jellyfin standards  
+> ✨ **Complete metadata** for perfect library integration
+
+---
+
+## 🌐 Web Interface
+
+OpforJellyfin includes a beautiful web UI for managing your One Pace library!
+
+**Quick Start:**
+```bash
+./opfor serve --port 8090
+# Visit http://localhost:8090
+```
+
+**Features:**
+- 📺 Browse and search episodes with filters
+- ⬇️ One-click downloads to external clients
+- 📊 Real-time progress tracking
+- ⚙️ Torrent client integration (qBittorrent, Deluge, Transmission)
+- 🔄 Metadata sync and system management
+
+See [WEB-UI.md](WEB-UI.md) for complete documentation.
+
+## 🔗 Torrent Client Integration
+
+OpforJellyfin supports multiple torrent clients:
+
+- **qBittorrent** - Recommended (WebUI API v2)
+- **Deluge** - Full support (JSON-RPC)
+- **Transmission** - Full support (RPC API)
+- **Internal Client** - Built-in Go torrent client (fallback)
+
+Configure your preferred client in the Web UI Settings page. See [TORRENT-CLIENTS.md](TORRENT-CLIENTS.md) for detailed setup instructions.
+
+### Quick Setup
+
+1. Start OpforJellyfin web UI: `./opfor serve`
+2. Go to **Settings** → Configure your torrent client
+3. Click **Test Connection** to verify
+4. Start downloading from **Episodes** page!
 
 ---
 
@@ -64,11 +106,26 @@ This is fixed for next release.
 
 ## 🔧 Installation
 
-You can choose to either use one of the released versions or build from source yourself.
+Choose your preferred method:
+
+### 🐳 Docker (Recommended)
+
+Easiest way to get started with the web UI:
+
+```bash
+git clone https://github.com/tissla/opforjellyfin.git
+cd opforjellyfin
+docker-compose up -d
+# Visit http://localhost:8090
+```
+
+See [DOCKER.md](DOCKER.md) for complete Docker documentation.
+
+### 📦 Binary Releases
 
 For this program to work, you need to have 'git' installed.
 
-### [Releases](https://github.com/tissla/opforjellyfin/releases/tag/v1.0.0)
+#### [Releases](https://github.com/tissla/opforjellyfin/releases/tag/v1.0.0)
 
 MacOS / Linux:
 

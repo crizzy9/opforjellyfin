@@ -6,9 +6,17 @@ import "time"
 
 // config file
 type Config struct {
-	TargetDir  string        `json:"target_dir"`
-	GitHubRepo string        `json:"github_base_url"`
-	Source     ScraperConfig `json:"source"`
+	TargetDir     string              `json:"target_dir"`
+	GitHubRepo    string              `json:"github_base_url"`
+	Source        ScraperConfig       `json:"source"`
+	TorrentClient TorrentClientConfig `json:"torrent_client"`
+}
+
+type TorrentClientConfig struct {
+	Type     string `json:"type"`
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // scrape config
@@ -64,6 +72,8 @@ type TorrentDownload struct {
 	PlacementProgress string    //used for placement messages after download is done
 	Done              bool      // set to true when torrent is downloaded
 	Placed            bool      // set to true when files are placed, before clearing active downloads
+	ExternalHash      string    // hash from external torrent client
+	UseExternal       bool      // whether this download uses external client
 }
 
 // entry for dl
