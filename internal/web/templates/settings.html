@@ -1,4 +1,4 @@
-{{define "content"}}
+{{define "settings-content"}}
 <div class="header">
     <h1>Settings</h1>
 </div>
@@ -8,21 +8,45 @@
     <form hx-post="/api/settings/update" hx-target="#settings-alert" hx-swap="innerHTML">
         <div class="form-group">
             <label for="targetDir">Target Directory</label>
-            <input 
-                type="text" 
-                id="targetDir" 
-                name="targetDir" 
-                value="{{.Config.TargetDir}}"
-                placeholder="/media/One Piece/One Pace"
-                required
-            >
+            <div style="display: flex; gap: 10px;">
+                <input 
+                    type="text" 
+                    id="targetDir" 
+                    name="targetDir" 
+                    value="{{.Config.TargetDir}}"
+                    placeholder="/data/One Piece/One Pace"
+                    required
+                    style="flex: 1;"
+                >
+                <button 
+                    type="button" 
+                    class="btn" 
+                    onclick="showDirectoryBrowser()"
+                >
+                    📁 Browse
+                </button>
+            </div>
             <small style="color: var(--secondary-text);">
-                Directory where One Pace episodes will be downloaded and organized
+                Directory where One Pace episodes will be downloaded and organized. In Docker, use paths starting with /data
             </small>
         </div>
 
         <button type="submit" class="btn btn-success">💾 Save Settings</button>
     </form>
+</div>
+
+<div id="directory-browser" style="display: none; margin-top: 20px;" class="card">
+    <h3 style="margin-bottom: 15px;">Browse Directories</h3>
+    <div style="margin-bottom: 15px;">
+        <strong>Current Path:</strong> <span id="current-path">/</span>
+    </div>
+    <div id="directory-list" style="max-height: 400px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 5px;">
+        <!-- Directory list will be populated here -->
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn btn-success" onclick="selectCurrentDirectory()">✓ Select This Directory</button>
+        <button type="button" class="btn" onclick="hideDirectoryBrowser()">✕ Cancel</button>
+    </div>
 </div>
 
 <div class="card" style="margin-top: 20px;">
@@ -91,6 +115,64 @@
 <div id="settings-alert" style="margin-top: 20px;"></div>
 
 <script>
+let currentBrowsePath = '/data';
+
+function showDirectoryBrowser() {
+    document.getElementById('directory-browser').style.display = 'block';
+    const targetDir = document.getElementById('targetDir').value;
+    if (targetDir) {
+        currentBrowsePath = targetDir;
+    }
+    browseDirectory(currentBrowsePath);
+}
+
+function hideDirectoryBrowser() {
+    document.getElementById('directory-browser').style.display = 'none';
+}
+
+function selectCurrentDirectory() {
+    document.getElementById('targetDir').value = currentBrowsePath;
+    hideDirectoryBrowser();
+}
+
+function browseDirectory(path) {
+    currentBrowsePath = path;
+    
+    fetch('/api/settings/browse?path=' + encodeURIComponent(path))
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('current-path').textContent = data.currentPath;
+            
+            const listHtml = data.directories.map(dir => `
+                <div 
+                    style="padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; gap: 10px;"
+                    onclick="browseDirectory('${dir.path.replace(/'/g, "\\'")}')"
+                    onmouseover="this.style.backgroundColor='var(--accent-bg)'"
+                    onmouseout="this.style.backgroundColor='transparent'"
+                >
+                    <span style="font-size: 20px;">📁</span>
+                    <span>${escapeHtml(dir.name)}</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('directory-list').innerHTML = listHtml || '<p style="text-align: center; color: var(--secondary-text); padding: 20px;">No subdirectories found</p>';
+        })
+        .catch(error => {
+            document.getElementById('directory-list').innerHTML = `
+                <div class="alert alert-danger" style="margin: 10px;">
+                    ❌ Failed to browse directory: ${error.message}
+                </div>
+            `;
+        });
+}
+
+function escapeHtml(text) {
+    if(!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     if(evt.detail.target.id === 'settings-alert' || evt.detail.target.id === 'client-alert') {
         try {
@@ -155,4 +237,3 @@ document.body.addEventListener('htmx:responseError', function(evt) {
 </script>
 
 {{end}}
-{{template "base" .}}

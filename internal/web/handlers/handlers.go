@@ -10,6 +10,9 @@ import (
 	"opforjellyfin/internal/metadata"
 	"opforjellyfin/internal/scraper"
 	"opforjellyfin/internal/shared"
+	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -25,7 +28,7 @@ func HandleEpisodes(templates *template.Template) http.HandlerFunc {
 		data := map[string]any{
 			"Page": "episodes",
 		}
-		if err := templates.ExecuteTemplate(w, "episodes.html", data); err != nil {
+		if err := templates.ExecuteTemplate(w, "base", data); err != nil {
 			logger.Log(true, "Template error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
@@ -37,7 +40,7 @@ func HandleActivity(templates *template.Template) http.HandlerFunc {
 		data := map[string]any{
 			"Page": "activity",
 		}
-		if err := templates.ExecuteTemplate(w, "activity.html", data); err != nil {
+		if err := templates.ExecuteTemplate(w, "base", data); err != nil {
 			logger.Log(true, "Template error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
@@ -51,7 +54,7 @@ func HandleSettings(templates *template.Template) http.HandlerFunc {
 			"Page":   "settings",
 			"Config": cfg,
 		}
-		if err := templates.ExecuteTemplate(w, "settings.html", data); err != nil {
+		if err := templates.ExecuteTemplate(w, "base", data); err != nil {
 			logger.Log(true, "Template error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
@@ -63,7 +66,7 @@ func HandleSystem(templates *template.Template) http.HandlerFunc {
 		data := map[string]any{
 			"Page": "system",
 		}
-		if err := templates.ExecuteTemplate(w, "system.html", data); err != nil {
+		if err := templates.ExecuteTemplate(w, "base", data); err != nil {
 			logger.Log(true, "Template error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
@@ -299,5 +302,54 @@ func APIActivityStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"downloads": downloads,
 		"count":     len(downloads),
+	})
+}
+
+func APIBrowseDirectories(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		path = "/"
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read directory: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	var dirs []map[string]string
+
+	parent := filepath.Dir(path)
+	if parent != path {
+		dirs = append(dirs, map[string]string{
+			"name": "..",
+			"path": parent,
+		})
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			fullPath := filepath.Join(path, entry.Name())
+			dirs = append(dirs, map[string]string{
+				"name": entry.Name(),
+				"path": fullPath,
+			})
+		}
+	}
+
+	sort.Slice(dirs, func(i, j int) bool {
+		if dirs[i]["name"] == ".." {
+			return true
+		}
+		if dirs[j]["name"] == ".." {
+			return false
+		}
+		return dirs[i]["name"] < dirs[j]["name"]
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"currentPath": path,
+		"directories": dirs,
 	})
 }

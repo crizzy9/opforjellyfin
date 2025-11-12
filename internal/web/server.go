@@ -28,7 +28,6 @@ func StartServer(port int) error {
 	staticFS := http.FS(content)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(staticFS)))
 
-	mux.HandleFunc("/", handlers.HandleIndex(templates))
 	mux.HandleFunc("/episodes", handlers.HandleEpisodes(templates))
 	mux.HandleFunc("/activity", handlers.HandleActivity(templates))
 	mux.HandleFunc("/settings", handlers.HandleSettings(templates))
@@ -39,8 +38,11 @@ func StartServer(port int) error {
 	mux.HandleFunc("/api/episodes/download", handlers.APIDownloadEpisode)
 	mux.HandleFunc("/api/settings/update", handlers.APIUpdateSettings)
 	mux.HandleFunc("/api/settings/test-client", handlers.APITestClient)
+	mux.HandleFunc("/api/settings/browse", handlers.APIBrowseDirectories)
 	mux.HandleFunc("/api/system/sync", handlers.APISync)
 	mux.HandleFunc("/api/activity/status", handlers.APIActivityStatus)
+
+	mux.HandleFunc("/", handlers.HandleIndex(templates))
 
 	addr := fmt.Sprintf(":%d", port)
 	logger.Log(true, "🌐 Starting web server on http://localhost%s", addr)
