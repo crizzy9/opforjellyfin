@@ -33,8 +33,9 @@ func buildIndexFromDir(baseDir string) (*shared.MetadataIndex, error) {
 			return nil
 		}
 
-		seasonKey := fmt.Sprintf("Season %s", season)
-		if season == "00" || season == "0" {
+		seasonNum, _ := strconv.Atoi(season)
+		seasonKey := fmt.Sprintf("Season %d", seasonNum)
+		if seasonNum == 0 {
 			seasonKey = "Specials"
 		}
 
@@ -46,6 +47,7 @@ func buildIndexFromDir(baseDir string) (*shared.MetadataIndex, error) {
 		// check if SeasonIndex is there
 		if _, exists := index.Seasons[seasonKey]; !exists {
 			index.Seasons[seasonKey] = shared.SeasonIndex{
+				SeasonNumber: seasonNum,
 				EpisodeRange: make(map[string]shared.EpisodeData),
 			}
 		}
@@ -70,7 +72,8 @@ func buildIndexFromDir(baseDir string) (*shared.MetadataIndex, error) {
 
 func calculateSeasonRanges(index *shared.MetadataIndex) {
 
-	for skey, sidx := range index.Seasons {
+	for skey := range index.Seasons {
+		sidx := index.Seasons[skey]
 
 		if skey == "Specials" {
 			sidx.Range = "00-00"
@@ -128,8 +131,9 @@ func nameSeasons(index *shared.MetadataIndex, baseDir string) {
 	}
 
 	// Apply names to the index
-	for seasonKey, seasonData := range index.Seasons {
+	for seasonKey := range index.Seasons {
 		if name, exists := seasonNames[seasonKey]; exists {
+			seasonData := index.Seasons[seasonKey]
 			seasonData.Name = name
 			index.Seasons[seasonKey] = seasonData
 			logger.Log(false, "Named %s as '%s'", seasonKey, name)

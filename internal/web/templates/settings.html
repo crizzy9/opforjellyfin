@@ -7,27 +7,33 @@
     <h2 style="margin-bottom: 20px;">General Settings</h2>
     <form hx-post="/api/settings/update" hx-target="#settings-alert" hx-swap="innerHTML">
         <div class="form-group">
-            <label for="targetDir">Target Directory</label>
+            <label for="targetDir">Target Directory (Media Library)</label>
             <div style="display: flex; gap: 10px;">
                 <input 
                     type="text" 
                     id="targetDir" 
                     name="targetDir" 
                     value="{{.Config.TargetDir}}"
-                    placeholder="/data/One Piece/One Pace"
+                    placeholder="/data/media/One Piece/One Pace"
                     required
                     style="flex: 1;"
                 >
                 <button 
                     type="button" 
                     class="btn" 
-                    onclick="showDirectoryBrowser()"
+                    onclick="showDirectoryBrowser('targetDir')"
                 >
                     📁 Browse
                 </button>
             </div>
             <small style="color: var(--secondary-text);">
-                Directory where One Pace episodes will be downloaded and organized. In Docker, use paths starting with /data
+                Final destination where One Pace episodes will be organized. This is where Jellyfin/Plex will read files from.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <small style="color: var(--secondary-text);">
+                Directory where your torrent client saves completed downloads. Files will be hardlinked from here to the target directory. Leave blank to use target directory directly.
             </small>
         </div>
 
@@ -116,12 +122,14 @@
 
 <script>
 let currentBrowsePath = '/data';
+let currentBrowseField = 'targetDir';
 
-function showDirectoryBrowser() {
+function showDirectoryBrowser(fieldId) {
+    currentBrowseField = fieldId;
     document.getElementById('directory-browser').style.display = 'block';
-    const targetDir = document.getElementById('targetDir').value;
-    if (targetDir) {
-        currentBrowsePath = targetDir;
+    const fieldValue = document.getElementById(fieldId).value;
+    if (fieldValue) {
+        currentBrowsePath = fieldValue;
     }
     browseDirectory(currentBrowsePath);
 }
@@ -131,7 +139,7 @@ function hideDirectoryBrowser() {
 }
 
 function selectCurrentDirectory() {
-    document.getElementById('targetDir').value = currentBrowsePath;
+    document.getElementById(currentBrowseField).value = currentBrowsePath;
     hideDirectoryBrowser();
 }
 

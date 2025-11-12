@@ -51,6 +51,7 @@ type MetadataIndex struct {
 type SeasonIndex struct {
 	Range        string                 `json:"range"`
 	Name         string                 `json:"name"`
+	SeasonNumber int                    `json:"season_number"`
 	EpisodeRange map[string]EpisodeData `json:"episodes"`
 }
 
@@ -74,6 +75,8 @@ type TorrentDownload struct {
 	Placed            bool      // set to true when files are placed, before clearing active downloads
 	ExternalHash      string    // hash from external torrent client
 	UseExternal       bool      // whether this download uses external client
+	SavePath          string    // path where torrent client saved files
+	Imported          bool      // set to true when files are successfully imported/hardlinked
 }
 
 // entry for dl

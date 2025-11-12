@@ -1,0 +1,439 @@
+{{define "arcs-content"}}
+<div class="header">
+    <h1 id="page-title">One Pace Arcs</h1>
+    <div>
+        <button id="back-button" class="btn" style="display: none;" onclick="showArcsList()">
+            ← Back to Arcs
+        </button>
+        <button class="btn" onclick="refreshCurrentView()">
+            🔄 Refresh
+        </button>
+    </div>
+</div>
+
+<div id="arcs-list" 
+     hx-get="/api/arcs/list" 
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="spinner"></div>
+</div>
+
+<div id="arc-details" style="display: none;"></div>
+
+<script>
+let currentView = 'list';
+let currentSeasonKey = null;
+
+document.body.addEventListener('htmx:beforeSwap', function(evt) {
+    if(evt.detail.xhr.status === 404) {
+        evt.detail.shouldSwap = true;
+        evt.detail.isError = false;
+    }
+});
+
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if(evt.detail.target.id === 'arcs-list') {
+        try {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            renderArcs(data);
+        } catch(e) {
+            console.error('Failed to parse arcs:', e);
+        }
+    }
+});
+
+function refreshCurrentView() {
+    if(currentView === 'list') {
+        htmx.ajax('GET', '/api/arcs/list?refresh=true', {target: '#arcs-list'});
+    } else if(currentView === 'details' && currentSeasonKey) {
+        loadArcDetails(currentSeasonKey, true);
+    }
+}
+
+function showArcsList() {
+    currentView = 'list';
+    currentSeasonKey = null;
+    document.getElementById('arcs-list').style.display = 'block';
+    document.getElementById('arc-details').style.display = 'none';
+    document.getElementById('back-button').style.display = 'none';
+    document.getElementById('page-title').textContent = 'One Pace Arcs';
+}
+
+function loadArcDetails(seasonKey, forceRefresh = false) {
+    currentView = 'details';
+    currentSeasonKey = seasonKey;
+    
+    const url = '/api/arcs/details?seasonKey=' + encodeURIComponent(seasonKey) + 
+                (forceRefresh ? '&refresh=true' : '');
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            renderArcDetails(data);
+            document.getElementById('arcs-list').style.display = 'none';
+            document.getElementById('arc-details').style.display = 'block';
+            document.getElementById('back-button').style.display = 'inline-block';
+            document.getElementById('page-title').textContent = data.arc.name || data.arc.seasonKey;
+        })
+        .catch(err => {
+            console.error('Failed to load arc details:', err);
+            alert('Failed to load arc details');
+        });
+}
+
+function getStatusIcon(videoStatus) {
+    switch(videoStatus) {
+        case 0: return '<span class="status-icon status-missing" title="No episodes downloaded">✗</span>';
+        case 1: return '<span class="status-icon status-partial" title="Some episodes downloaded">⚠</span>';
+        case 2: return '<span class="status-icon status-complete" title="All episodes downloaded">✓</span>';
+        default: return '<span class="status-icon status-missing">?</span>';
+    }
+}
+
+function getMetadataIcon(hasMetadata) {
+    return hasMetadata 
+        ? '<span class="status-icon status-complete" title="Metadata available">📋</span>'
+        : '<span class="status-icon status-missing" title="No metadata">📋</span>';
+}
+
+function getEpisodeStatusIcon(hasVideo) {
+    return hasVideo
+        ? '<span class="status-icon status-complete" title="Downloaded">✓</span>'
+        : '<span class="status-icon status-missing" title="Not downloaded">✗</span>';
+}
+
+function renderArcs(arcs) {
+    const container = document.getElementById('arcs-list');
+    
+    if(!arcs || arcs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <h3>No arcs found</h3>
+                <p>Run sync in System settings to fetch metadata</p>
+            </div>
+        `;
+        return;
+    }
+
+    const html = `
+        <div class="arcs-table-container">
+            <table class="arcs-table">
+                <thead>
+                    <tr>
+                        <th>Arc Name</th>
+                        <th>Chapter Range</th>
+                        <th>Episodes</th>
+                        <th class="text-center">Metadata</th>
+                        <th class="text-center">Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${arcs.map(arc => `
+                        <tr class="arc-row" onclick="loadArcDetails('${escapeHtml(arc.seasonKey)}')">
+                            <td class="arc-name">
+                                <strong>${escapeHtml(arc.name || arc.seasonKey)}</strong>
+                                ${arc.seasonNumber > 0 ? `<span class="season-number">Season ${arc.seasonNumber}</span>` : ''}
+                            </td>
+                            <td class="arc-range">${escapeHtml(arc.chapterRange)}</td>
+                            <td class="arc-episodes">${arc.episodeCount} episode${arc.episodeCount !== 1 ? 's' : ''}</td>
+                            <td class="text-center">${getMetadataIcon(arc.hasMetadata)}</td>
+                            <td class="text-center">${getStatusIcon(arc.videoStatus)}</td>
+                            <td class="arc-actions-cell" onclick="event.stopPropagation()">
+                                <button class="btn-icon" title="Search for arc" onclick="openSearchModal('${escapeHtml(arc.chapterRange)}', '${escapeHtml(arc.name || arc.seasonKey)}')">🔍</button>
+                                ${arc.downloadKey > 0 ? `
+                                <button 
+                                    class="btn-icon" 
+                                    title="Download arc"
+                                    onclick="downloadTorrent(${arc.downloadKey}, '${escapeHtml(arc.name || arc.seasonKey)}')"
+                                >⬇️</button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function renderArcDetails(data) {
+    const container = document.getElementById('arc-details');
+    const arc = data.arc;
+    const episodes = data.episodes;
+    
+    const html = `
+        <div class="arc-details-header card">
+            <div class="arc-info">
+                <h2>${escapeHtml(arc.name || arc.seasonKey)}</h2>
+                <p class="arc-meta-info">
+                    <span>Chapter Range: ${escapeHtml(arc.chapterRange)}</span>
+                    <span class="separator">•</span>
+                    <span>${arc.episodeCount} episodes</span>
+                    <span class="separator">•</span>
+                    <span>${getStatusIcon(arc.videoStatus)} Status</span>
+                </p>
+            </div>
+            <div class="arc-actions">
+                <button class="btn" title="Search for all episodes" onclick="openSearchModal('${escapeHtml(arc.chapterRange)}', '${escapeHtml(arc.name || arc.seasonKey)}')">🔍 Search All</button>
+                ${arc.downloadKey > 0 ? `
+                <button 
+                    class="btn btn-success" 
+                    title="Download entire arc"
+                    onclick="downloadTorrent(${arc.downloadKey}, '${escapeHtml(arc.name || arc.seasonKey)}')"
+                >⬇️ Download Arc</button>
+                ` : ''}
+            </div>
+        </div>
+        
+        <div class="episodes-table-container">
+            <table class="arcs-table">
+                <thead>
+                    <tr>
+                        <th>Episode</th>
+                        <th>Chapter Range</th>
+                        <th class="text-center">Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${episodes.map(ep => `
+                        <tr class="episode-row">
+                            <td class="episode-title">${escapeHtml(ep.title)}</td>
+                            <td class="episode-range">${escapeHtml(ep.chapterRange)}</td>
+                            <td class="text-center">${getEpisodeStatusIcon(ep.hasVideo)}</td>
+                            <td class="episode-actions-cell">
+                                <button class="btn-icon" title="Search for episode" onclick="openSearchModal('${escapeHtml(ep.chapterRange)}', '${escapeHtml(ep.title)}')">🔍</button>
+                                ${ep.downloadKey > 0 ? `
+                                <button 
+                                    class="btn-icon" 
+                                    title="Download episode"
+                                    onclick="downloadTorrent(${ep.downloadKey}, '${escapeHtml(ep.title)}')"
+                                >⬇️</button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    if(!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function openSearchModal(range, title) {
+    document.getElementById('search-modal-title').textContent = 'Search Results: ' + title;
+    document.getElementById('search-modal').style.display = 'flex';
+    document.getElementById('search-results').innerHTML = '<div class="spinner"></div>';
+    
+    fetch('/api/arcs/search?range=' + encodeURIComponent(range))
+        .then(response => response.json())
+        .then(data => {
+            renderSearchResults(data);
+        })
+        .catch(err => {
+            console.error('Failed to search:', err);
+            document.getElementById('search-results').innerHTML = '<p>Failed to load search results</p>';
+        });
+}
+
+function closeSearchModal() {
+    document.getElementById('search-modal').style.display = 'none';
+}
+
+function renderSearchResults(torrents) {
+    const container = document.getElementById('search-results');
+    
+    if(!torrents || torrents.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>No torrents found for this range</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const html = torrents.map(t => `
+        <div class="search-result-item">
+            <div class="search-result-info">
+                <div class="search-result-title">${escapeHtml(t.TorrentName)}</div>
+                <div class="search-result-meta">
+                    <span>Quality: <strong>${escapeHtml(t.Quality)}</strong></span>
+                    <span>Seeders: <strong>${t.Seeders}</strong></span>
+                    <span>Range: ${escapeHtml(t.ChapterRange)}</span>
+                    <span>Date: ${escapeHtml(t.Date)}</span>
+                </div>
+            </div>
+            <div class="search-result-actions">
+                <button 
+                    class="btn btn-success"
+                    onclick="downloadTorrent(${t.DownloadKey}, '${escapeHtml(t.TorrentName)}')"
+                >
+                    ⬇️ Download
+                </button>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+}
+
+function downloadTorrent(downloadKey, name) {
+    const formData = new FormData();
+    formData.append('downloadKey', downloadKey);
+    
+    fetch('/api/arcs/download', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            showAlert('success', data.message || 'Download started successfully');
+            closeSearchModal();
+            refreshCurrentView();
+        } else {
+            showAlert('error', 'Download failed: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        console.error('Download failed:', err);
+        showAlert('error', 'Download failed: ' + err);
+    });
+}
+
+function showAlert(type, message) {
+    const container = document.getElementById('alert-container');
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    container.innerHTML = `<div class="alert ${alertClass}">${escapeHtml(message)}</div>`;
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000);
+}
+</script>
+
+<div id="alert-container"></div>
+
+<div id="search-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="search-modal-title">Search Results</h2>
+            <button class="modal-close" onclick="closeSearchModal()">✕</button>
+        </div>
+        <div id="search-results" class="modal-body">
+            <div class="spinner"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.season-number {
+    display: block;
+    font-size: 12px;
+    color: var(--secondary-text);
+    font-weight: normal;
+    margin-top: 4px;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 900px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    color: var(--secondary-text);
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.modal-close:hover {
+    color: var(--primary-text);
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    background-color: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-result-info {
+    flex: 1;
+}
+
+.search-result-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.search-result-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 13px;
+    color: var(--secondary-text);
+}
+
+.search-result-actions {
+    display: flex;
+    gap: 10px;
+}
+</style>
+
+{{end}}

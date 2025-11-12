@@ -1,9 +1,39 @@
 - [x] Make it selfhostable
 - [x] build a UI
 - [x] Allow downloading via a torrent client
-- [ ] Download changes in the UI
-- [ ] Testing
-- [ ] Nixos based deployment
+- [x] Testing
+- [x] Download changes in the UI
+- [x] List changes in the UI
+- [ ] Download testing
+- [ ] Hardlinking like sonarr (untested)
+  - [x] Download directory setup via torrent client
+- [ ] Torrent connectivity
+  - [ ] Qbittorrent (untested)
+  - [ ] Transmission (Untested)
+  - [ ] Deluge (Untested)
+- [x] Browser caching or database
+- [ ] UI overhaul
+  - [x] Proper sidebar like sonarr (implementation didnt work)
+  - [x] Loading spinner
+  - [x] Background color
+  - [x] Font change
+  - [x] Show clickable items with an underscore like a href
+  - [x] Show Season number in the arcs list and sort by season
+  - [ ] Log Viewing
+  - [ ] Images for Arcs
+  - [ ] Settings and System overhaul to be similar to sonarr
+  - [ ] Name change
+  - [ ] Logo change
+  - [ ] Icon changes
+- [ ] use go templ (check htmx-go-templ project)
 - [ ] Strip the CLI functionality
+- [ ] Unit Tests
+- [ ] Nixos based deployment
 - [ ] Complementry updates based on other changes and user testing
 - [ ] Create a proper readme
+- [ ] Finalize
+  - [ ] docker image
+  - [ ] nixpkgs image
+  - [ ] reddit post
+  - [ ] github settings
+  - [ ] build pipeline

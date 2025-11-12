@@ -1,14 +1,14 @@
 {{define "activity-content"}}
 <div class="header">
-    <h1>Activity & Queue</h1>
+    <h1>Activity</h1>
     <button class="btn" onclick="location.reload()">🔄 Refresh</button>
 </div>
 
-<div class="card">
-    <h2 style="margin-bottom: 20px;">Active Downloads</h2>
+<div class="activity-section">
+    <h2 class="section-title">Queue</h2>
     <div id="activity-list" 
          hx-get="/api/activity/status" 
-         hx-trigger="load, every 2s"
+         hx-trigger="load, every 3s"
          hx-swap="innerHTML">
         <div class="spinner"></div>
     </div>
@@ -26,6 +26,24 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
     }
 });
 
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+}
+
+function getStatusBadge(dl) {
+    if (dl.Imported || dl.Placed) {
+        return '<span class="status-badge status-imported">Imported</span>';
+    } else if (dl.Done) {
+        return '<span class="status-badge status-downloaded">Downloaded</span>';
+    } else {
+        return '<span class="status-badge status-downloading">Downloading</span>';
+    }
+}
+
 function renderActivity(data) {
     const container = document.getElementById('activity-list');
     
@@ -34,42 +52,41 @@ function renderActivity(data) {
             <div class="empty-state">
                 <div class="empty-state-icon">💤</div>
                 <h3>No active downloads</h3>
-                <p>Go to Episodes to start downloading</p>
+                <p>Downloads will appear here automatically when you add them</p>
             </div>
         `;
         return;
     }
 
-    const html = `
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Progress</th>
-                    <th>Status</th>
-                    <th>Chapter Range</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${data.downloads.map(dl => {
-                    const progress = dl.TotalSize > 0 ? Math.round((dl.Progress / dl.TotalSize) * 100) : 0;
-                    return `
-                        <tr>
-                            <td>${escapeHtml(dl.Title)}</td>
-                            <td>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${progress}%"></div>
-                                </div>
-                                <small>${progress}%</small>
-                            </td>
-                            <td>${dl.Done ? '✅ Complete' : dl.PlacementProgress || '⏳ Downloading...'}</td>
-                            <td>${escapeHtml(dl.ChapterRange)}</td>
-                        </tr>
-                    `;
-                }).join('')}
-            </tbody>
-        </table>
-    `;
+    const html = data.downloads.map(dl => {
+        const progress = dl.TotalSize > 0 ? Math.round((dl.Progress / dl.TotalSize) * 100) : 0;
+        const downloaded = formatBytes(dl.Progress);
+        const total = formatBytes(dl.TotalSize);
+        
+        return `
+            <div class="activity-item">
+                <div class="activity-header">
+                    <div class="activity-title">
+                        <strong>${escapeHtml(dl.Title)}</strong>
+                        <span class="activity-range">${escapeHtml(dl.ChapterRange)}</span>
+                    </div>
+                    ${getStatusBadge(dl)}
+                </div>
+                <div class="activity-progress">
+                    <div class="progress-bar-sonarr">
+                        <div class="progress-fill-sonarr" style="width: ${progress}%"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span>${progress}%</span>
+                        ${dl.TotalSize > 0 ? `<span>${downloaded} / ${total}</span>` : ''}
+                    </div>
+                </div>
+                ${dl.PlacementProgress ? `
+                    <div class="activity-status">${dl.PlacementProgress}</div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
     
     container.innerHTML = html;
 }

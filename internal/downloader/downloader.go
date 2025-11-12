@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"opforjellyfin/internal/client"
 	"opforjellyfin/internal/logger"
+	"opforjellyfin/internal/matcher"
+	"opforjellyfin/internal/metadata"
 	"opforjellyfin/internal/shared"
 	"time"
 )
@@ -40,9 +42,8 @@ func queueExternalDownload(entry *shared.TorrentEntry, torrentURL string, cfg sh
 	}
 
 	ctx := context.Background()
-	savePath := cfg.TargetDir
 
-	hash, err := torrentClient.AddTorrent(ctx, torrentURL, savePath)
+	hash, err := torrentClient.AddTorrent(ctx, torrentURL, "")
 	if err != nil {
 		return fmt.Errorf("failed to add torrent to client: %w", err)
 	}
@@ -55,6 +56,7 @@ func queueExternalDownload(entry *shared.TorrentEntry, torrentURL string, cfg sh
 		ChapterRange: entry.ChapterRange,
 		ExternalHash: hash,
 		UseExternal:  true,
+		Imported:     false,
 	}
 
 	shared.SaveTorrentDownload(td)
@@ -92,4 +94,35 @@ func TestConnection(cfg shared.TorrentClientConfig) (string, error) {
 	}
 
 	return fmt.Sprintf("%s v%s", cfg.Type, info.Version), nil
+}
+
+func ImportCompletedDownload(td *shared.TorrentDownload, status *client.TorrentStatus, cfg shared.Config) error {
+	if td.Imported {
+		return nil
+	}
+
+	if !status.IsComplete {
+		return fmt.Errorf("torrent not complete")
+	}
+
+	td.SavePath = status.SavePath
+	td.PlacementProgress = "🔗 Importing files..."
+	shared.SaveTorrentDownload(td)
+
+	logger.Log(false, "Importing completed download from: %s", status.SavePath)
+
+	index := metadata.LoadMetadataCache()
+	if index == nil {
+		return fmt.Errorf("metadata cache not loaded")
+	}
+
+	matcher.ProcessTorrentFiles(status.SavePath, cfg.TargetDir, td, index)
+
+	td.Imported = true
+	td.Placed = true
+	td.Done = true
+	shared.SaveTorrentDownload(td)
+
+	logger.Log(false, "Successfully imported: %s", td.Title)
+	return nil
 }

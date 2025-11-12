@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpforJellyfin - One Pace Manager</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -15,7 +15,7 @@
             <nav>
                 <ul class="nav-menu">
                     <li class="nav-item">
-                        <a href="/episodes" {{if eq .Page "episodes"}}class="active"{{end}}>📺 Episodes</a>
+                        <a href="/arcs" {{if eq .Page "arcs"}}class="active"{{end}}>📚 Arcs</a>
                     </li>
                     <li class="nav-item">
                         <a href="/activity" {{if eq .Page "activity"}}class="active"{{end}}>📊 Activity</a>
@@ -30,7 +30,7 @@
             </nav>
         </aside>
         <main class="main-content">
-            {{if eq .Page "episodes"}}{{template "episodes-content" .}}{{end}}
+            {{if eq .Page "arcs"}}{{template "arcs-content" .}}{{end}}
             {{if eq .Page "activity"}}{{template "activity-content" .}}{{end}}
             {{if eq .Page "settings"}}{{template "settings-content" .}}{{end}}
             {{if eq .Page "system"}}{{template "system-content" .}}{{end}}

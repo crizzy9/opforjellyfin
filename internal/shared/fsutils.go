@@ -36,35 +36,37 @@ func CreateTempTorrentDir(torrentID int) (string, error) {
 	return tmpDir, nil
 }
 
-// SafeMoveFile moves a file safely, creates the directory if it does not exist
+// SafeMoveFile moves or hardlinks a file depending on context
 // This function is thread-safe and handles concurrent file operations
+// Always tries hardlink first to preserve files for seeding, falls back to copy if needed
 func SafeMoveFile(src, dst string) error {
-	// Lock for the entire move operation to ensure atomicity
 	dirMutex.Lock()
 	defer dirMutex.Unlock()
 
-	logger.Log(false, "sfm: starting move from %s to %s", src, dst)
+	logger.Log(false, "sfm: starting operation from %s to %s", src, dst)
 
-	// Ensure destination directory exists
 	dstDir := filepath.Dir(dst)
 	if err := os.MkdirAll(dstDir, 0755); err != nil {
 		logger.Log(true, "sfm: failed to create dst dir: %v", err)
 		return err
 	}
 
-	logger.Log(false, "sfm: copying file from %s to %s", src, dst)
-	if err := copyFileInternal(src, dst, 0644); err != nil {
-		logger.Log(true, "sfm: copyFile failed: %v", err)
-		return err
+	if FileExists(dst) {
+		logger.Log(false, "sfm: destination already exists: %s", dst)
+		return nil
 	}
-	logger.Log(false, "sfm: copyFile succeeded")
 
-	logger.Log(false, "sfm: removing source file: %s", src)
-	if err := os.Remove(src); err != nil {
-		logger.Log(true, "sfm: failed to remove src: %v", err)
-		return err
+	logger.Log(false, "sfm: attempting hardlink from %s to %s", src, dst)
+	if err := os.Link(src, dst); err != nil {
+		logger.Log(false, "sfm: hardlink failed (%v), trying copy", err)
+		if err := copyFileInternal(src, dst, 0644); err != nil {
+			logger.Log(true, "sfm: copyFile failed: %v", err)
+			return err
+		}
+		logger.Log(false, "sfm: copyFile succeeded")
+	} else {
+		logger.Log(false, "sfm: hardlink succeeded, source preserved for seeding")
 	}
-	logger.Log(false, "sfm: source file removed")
 
 	return nil
 }
