@@ -74,6 +74,11 @@ func (q *QBittorrentClient) TestConnection() error {
 }
 
 func (q *QBittorrentClient) AddTorrent(ctx context.Context, torrentURL string, savePath string) (string, error) {
+	existingTorrents, err := q.getExistingHashes()
+	if err != nil {
+		return "", fmt.Errorf("failed to get existing torrents: %w", err)
+	}
+
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
@@ -102,7 +107,7 @@ func (q *QBittorrentClient) AddTorrent(ctx context.Context, torrentURL string, s
 		return "", fmt.Errorf("failed to add torrent: %s", string(bodyBytes))
 	}
 
-	hash, err := q.getTorrentHashByURL(torrentURL)
+	hash, err := q.getNewlyAddedHash(existingTorrents)
 	if err != nil {
 		return "", fmt.Errorf("torrent added but failed to get hash: %w", err)
 	}
@@ -110,8 +115,32 @@ func (q *QBittorrentClient) AddTorrent(ctx context.Context, torrentURL string, s
 	return hash, nil
 }
 
-func (q *QBittorrentClient) getTorrentHashByURL(torrentURL string) (string, error) {
+func (q *QBittorrentClient) getExistingHashes() (map[string]bool, error) {
+	resp, err := q.client.Get(q.config.URL + "/api/v2/torrents/info?category=OnePace")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var torrents []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
+		return nil, err
+	}
+
+	existing := make(map[string]bool)
+	for _, t := range torrents {
+		if hash, ok := t["hash"].(string); ok {
+			existing[hash] = true
+		}
+	}
+
+	return existing, nil
+}
+
+func (q *QBittorrentClient) getNewlyAddedHash(existingHashes map[string]bool) (string, error) {
 	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+
 		resp, err := q.client.Get(q.config.URL + "/api/v2/torrents/info?category=OnePace")
 		if err != nil {
 			return "", err
@@ -125,20 +154,20 @@ func (q *QBittorrentClient) getTorrentHashByURL(torrentURL string) (string, erro
 		resp.Body.Close()
 
 		for _, t := range torrents {
-			hash, _ := t["hash"].(string)
-			magnetURI, _ := t["magnet_uri"].(string)
+			hash, ok := t["hash"].(string)
+			if !ok {
+				continue
+			}
 
-			if strings.Contains(magnetURI, torrentURL) || strings.Contains(torrentURL, hash) {
+			if !existingHashes[hash] {
+				name, _ := t["name"].(string)
+				fmt.Printf("Found new torrent: %s (hash: %s)\n", name, hash)
 				return hash, nil
 			}
 		}
-
-		if i < 9 {
-			time.Sleep(500 * time.Millisecond)
-		}
 	}
 
-	return "", fmt.Errorf("could not find torrent hash after adding")
+	return "", fmt.Errorf("could not find newly added torrent hash after 5 seconds (checked %d existing torrents)", len(existingHashes))
 }
 
 func (q *QBittorrentClient) GetTorrentStatus(torrentID string) (*TorrentStatus, error) {
