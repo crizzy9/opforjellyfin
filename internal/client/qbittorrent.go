@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"opforjellyfin/internal/shared"
 	"strings"
+	"time"
 )
 
 type QBittorrentClient struct {
@@ -77,7 +78,9 @@ func (q *QBittorrentClient) AddTorrent(ctx context.Context, torrentURL string, s
 	writer := multipart.NewWriter(body)
 
 	writer.WriteField("urls", torrentURL)
-	writer.WriteField("savepath", savePath)
+	if savePath != "" {
+		writer.WriteField("savepath", savePath)
+	}
 	writer.WriteField("category", "OnePace")
 
 	writer.Close()
@@ -99,11 +102,47 @@ func (q *QBittorrentClient) AddTorrent(ctx context.Context, torrentURL string, s
 		return "", fmt.Errorf("failed to add torrent: %s", string(bodyBytes))
 	}
 
-	return torrentURL, nil
+	hash, err := q.getTorrentHashByURL(torrentURL)
+	if err != nil {
+		return "", fmt.Errorf("torrent added but failed to get hash: %w", err)
+	}
+
+	return hash, nil
+}
+
+func (q *QBittorrentClient) getTorrentHashByURL(torrentURL string) (string, error) {
+	for i := 0; i < 10; i++ {
+		resp, err := q.client.Get(q.config.URL + "/api/v2/torrents/info?category=OnePace")
+		if err != nil {
+			return "", err
+		}
+
+		var torrents []map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&torrents); err != nil {
+			resp.Body.Close()
+			return "", err
+		}
+		resp.Body.Close()
+
+		for _, t := range torrents {
+			hash, _ := t["hash"].(string)
+			magnetURI, _ := t["magnet_uri"].(string)
+
+			if strings.Contains(magnetURI, torrentURL) || strings.Contains(torrentURL, hash) {
+				return hash, nil
+			}
+		}
+
+		if i < 9 {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
+	return "", fmt.Errorf("could not find torrent hash after adding")
 }
 
 func (q *QBittorrentClient) GetTorrentStatus(torrentID string) (*TorrentStatus, error) {
-	resp, err := q.client.Get(q.config.URL + "/api/v2/torrents/info")
+	resp, err := q.client.Get(q.config.URL + "/api/v2/torrents/info?hashes=" + torrentID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,34 +153,33 @@ func (q *QBittorrentClient) GetTorrentStatus(torrentID string) (*TorrentStatus, 
 		return nil, err
 	}
 
-	for _, t := range torrents {
-		hash, _ := t["hash"].(string)
-		if hash == torrentID || strings.Contains(t["name"].(string), torrentID) {
-			name, _ := t["name"].(string)
-			state, _ := t["state"].(string)
-			progress, _ := t["progress"].(float64)
-			downloaded, _ := t["downloaded"].(float64)
-			totalSize, _ := t["size"].(float64)
-			dlspeed, _ := t["dlspeed"].(float64)
-			upspeed, _ := t["upspeed"].(float64)
-			savePath, _ := t["save_path"].(string)
-
-			return &TorrentStatus{
-				ID:            hash,
-				Name:          name,
-				State:         state,
-				Progress:      progress * 100,
-				Downloaded:    int64(downloaded),
-				TotalSize:     int64(totalSize),
-				DownloadSpeed: int64(dlspeed),
-				UploadSpeed:   int64(upspeed),
-				SavePath:      savePath,
-				IsComplete:    progress >= 1.0,
-			}, nil
-		}
+	if len(torrents) == 0 {
+		return nil, fmt.Errorf("torrent not found: %s", torrentID)
 	}
 
-	return nil, fmt.Errorf("torrent not found")
+	t := torrents[0]
+	hash, _ := t["hash"].(string)
+	name, _ := t["name"].(string)
+	state, _ := t["state"].(string)
+	progress, _ := t["progress"].(float64)
+	downloaded, _ := t["downloaded"].(float64)
+	totalSize, _ := t["size"].(float64)
+	dlspeed, _ := t["dlspeed"].(float64)
+	upspeed, _ := t["upspeed"].(float64)
+	savePath, _ := t["save_path"].(string)
+
+	return &TorrentStatus{
+		ID:            hash,
+		Name:          name,
+		State:         state,
+		Progress:      progress * 100,
+		Downloaded:    int64(downloaded),
+		TotalSize:     int64(totalSize),
+		DownloadSpeed: int64(dlspeed),
+		UploadSpeed:   int64(upspeed),
+		SavePath:      savePath,
+		IsComplete:    progress >= 1.0,
+	}, nil
 }
 
 func (q *QBittorrentClient) RemoveTorrent(torrentID string, deleteFiles bool) error {

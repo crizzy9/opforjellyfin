@@ -49,30 +49,48 @@ func (w *Worker) run() {
 func (w *Worker) checkAndImportDownloads() {
 	downloads := shared.GetActiveDownloads()
 
+	if len(downloads) > 0 {
+		logger.Log(false, "Worker: Checking %d active downloads", len(downloads))
+	}
+
 	hasImports := false
 	for _, td := range downloads {
-		if !td.UseExternal || td.Imported {
+		if !td.UseExternal {
+			logger.Log(false, "Worker: Skipping internal download: %s", td.Title)
 			continue
 		}
 
+		if td.Imported {
+			logger.Log(false, "Worker: Already imported: %s", td.Title)
+			continue
+		}
+
+		logger.Log(false, "Worker: Checking status for %s (hash: %s)", td.Title, td.ExternalHash)
 		status, err := GetDownloadStatus(td, w.cfg)
 		if err != nil {
-			logger.Log(false, "Error checking download status for %s: %v", td.Title, err)
+			logger.Log(true, "Worker: Error checking download status for %s: %v", td.Title, err)
 			continue
 		}
 
-		if status == nil || !status.IsComplete {
+		if status == nil {
+			logger.Log(false, "Worker: No status returned for %s", td.Title)
 			continue
 		}
 
-		logger.Log(false, "Download completed, importing: %s", td.Title)
+		logger.Log(false, "Worker: %s - Progress: %.1f%%, Complete: %v", td.Title, status.Progress, status.IsComplete)
+
+		if !status.IsComplete {
+			continue
+		}
+
+		logger.Log(true, "Worker: Download completed, importing: %s from %s", td.Title, status.SavePath)
 
 		if err := ImportCompletedDownload(td, status, w.cfg); err != nil {
-			logger.Log(true, "Failed to import download %s: %v", td.Title, err)
+			logger.Log(true, "Worker: Failed to import download %s: %v", td.Title, err)
 			td.PlacementProgress = "❌ Import failed"
 			shared.SaveTorrentDownload(td)
 		} else {
-			logger.Log(false, "Successfully imported: %s", td.Title)
+			logger.Log(true, "Worker: Successfully imported: %s", td.Title)
 			hasImports = true
 		}
 	}

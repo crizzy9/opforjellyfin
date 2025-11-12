@@ -13,6 +13,7 @@
   - [ ] Deluge (Untested)
 - [ ] Activity tab not auto polling % not working after refresh
 - [ ] Hardlinking like sonarr (not working)
+- [ ] episode search not searching for the correct episode
 - [ ] English support
 - [ ] other formats support
 - [ ] Maybe remove download and allow setting a prefered resolution and then just do search and auto search
