@@ -4,14 +4,18 @@
 - [x] Testing
 - [x] Download changes in the UI
 - [x] List changes in the UI
-- [ ] Download testing (failed)
-- [ ] Hardlinking like sonarr (untested)
-  - [x] Download directory setup via torrent client
-- [ ] Torrent connectivity
-  - [ ] Qbittorrent (untested)
+- [x] Download directory setup via torrent client
+- [x] Download testing (pass)
+- [x] Browser caching or database
+- [x] Torrent connectivity
+  - [x] Qbittorrent
   - [ ] Transmission (Untested)
   - [ ] Deluge (Untested)
-- [x] Browser caching or database
+- [ ] Activity tab not auto polling % not working after refresh
+- [ ] Hardlinking like sonarr (not working)
+- [ ] English support
+- [ ] other formats support
+- [ ] Maybe remove download and allow setting a prefered resolution and then just do search and auto search
 - [ ] Add other indexers than nyaa
 - [ ] UI overhaul
   - [x] Proper sidebar like sonarr (implementation didnt work)

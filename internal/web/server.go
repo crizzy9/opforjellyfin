@@ -6,7 +6,9 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"opforjellyfin/internal/downloader"
 	"opforjellyfin/internal/logger"
+	"opforjellyfin/internal/shared"
 	"opforjellyfin/internal/web/handlers"
 )
 
@@ -24,6 +26,14 @@ func init() {
 }
 
 func StartServer(port int) error {
+	cfg := shared.LoadConfig()
+
+	worker := downloader.NewWorker(cfg, func() {
+		handlers.InvalidateArcsCache()
+	})
+	worker.Start()
+	defer worker.Stop()
+
 	mux := http.NewServeMux()
 
 	staticSubFS, err := fs.Sub(content, "static")

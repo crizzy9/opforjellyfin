@@ -53,6 +53,8 @@ type SeasonIndex struct {
 	Name         string                 `json:"name"`
 	SeasonNumber int                    `json:"season_number"`
 	EpisodeRange map[string]EpisodeData `json:"episodes"`
+	Quality      string                 `json:"quality,omitempty"`
+	Language     string                 `json:"language,omitempty"`
 }
 
 // episodes maps titles and have

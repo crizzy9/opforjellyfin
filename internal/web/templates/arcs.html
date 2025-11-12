@@ -206,12 +206,12 @@ function renderArcDetails(data) {
                             <td class="episode-range">${escapeHtml(ep.chapterRange)}</td>
                             <td class="text-center">${getEpisodeStatusIcon(ep.hasVideo)}</td>
                             <td class="episode-actions-cell">
-                                <button class="btn-icon" title="Search for episode" onclick="openSearchModal('${escapeHtml(ep.chapterRange)}', '${escapeHtml(ep.title)}')">🔍</button>
+                                <button class="btn-icon" title="Search for episode" onclick="openSearchModal('${ep.chapterRange.replace(/'/g, "\\'")}', '${ep.title.replace(/'/g, "\\'")}')">🔍</button>
                                 ${ep.downloadKey > 0 ? `
                                 <button 
                                     class="btn-icon" 
                                     title="Download episode"
-                                    onclick="downloadTorrent(${ep.downloadKey}, '${escapeHtml(ep.title)}')"
+                                    onclick="downloadTorrent(${ep.downloadKey}, '${ep.title.replace(/'/g, "\\'")}')"
                                 >⬇️</button>
                                 ` : ''}
                             </td>
