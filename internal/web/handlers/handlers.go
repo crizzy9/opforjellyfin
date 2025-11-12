@@ -341,27 +341,45 @@ func APISearchArcs(w http.ResponseWriter, r *http.Request) {
 }
 
 func APIDownloadArc(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Method not allowed",
+		})
 		return
 	}
 
 	downloadKeyStr := r.FormValue("downloadKey")
 	downloadKey, err := strconv.Atoi(downloadKeyStr)
 	if err != nil {
-		http.Error(w, "Invalid download key", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Invalid download key",
+		})
 		return
 	}
 
 	cfg := shared.LoadConfig()
 	if cfg.TargetDir == "" {
-		http.Error(w, "Target directory not set", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Target directory not set",
+		})
 		return
 	}
 
 	torrents, err := scraper.FetchTorrents(cfg)
 	if err != nil {
-		http.Error(w, "Failed to fetch torrents", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Failed to fetch torrents",
+		})
 		return
 	}
 
@@ -376,20 +394,27 @@ func APIDownloadArc(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if match == nil {
-		http.Error(w, "Torrent not found", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Torrent not found",
+		})
 		return
 	}
 
 	torrentURL := fmt.Sprintf("%s/download/%d.torrent", cfg.Source.BaseURL, match.TorrentID)
 
 	if err := downloader.QueueDownload(match, torrentURL, cfg); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to queue download: %v", err), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": fmt.Sprintf("Failed to queue download: %v", err),
+		})
 		return
 	}
 
 	InvalidateArcsCache()
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"success": true,
 		"message": fmt.Sprintf("Added %s to download queue", match.TorrentName),

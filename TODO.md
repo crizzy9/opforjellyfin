@@ -4,7 +4,7 @@
 - [x] Testing
 - [x] Download changes in the UI
 - [x] List changes in the UI
-- [ ] Download testing
+- [ ] Download testing (failed)
 - [ ] Hardlinking like sonarr (untested)
   - [x] Download directory setup via torrent client
 - [ ] Torrent connectivity
@@ -12,6 +12,7 @@
   - [ ] Transmission (Untested)
   - [ ] Deluge (Untested)
 - [x] Browser caching or database
+- [ ] Add other indexers than nyaa
 - [ ] UI overhaul
   - [x] Proper sidebar like sonarr (implementation didnt work)
   - [x] Loading spinner
@@ -22,9 +23,10 @@
   - [ ] Log Viewing
   - [ ] Images for Arcs
   - [ ] Settings and System overhaul to be similar to sonarr
+  - [ ] Mobile UI (collapsible sidebar)
   - [ ] Name change
   - [ ] Logo change
-  - [ ] Icon changes
+  - [ ] Icon and notation changes
 - [ ] use go templ (check htmx-go-templ project)
 - [ ] Strip the CLI functionality
 - [ ] Unit Tests
