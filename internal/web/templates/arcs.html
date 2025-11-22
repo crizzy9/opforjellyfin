@@ -178,13 +178,14 @@ function renderArcDetails(data) {
                 </p>
             </div>
             <div class="arc-actions">
-                <button class="btn" title="Search for all episodes" onclick="openSearchModal('${escapeHtml(arc.chapterRange)}', '${escapeHtml(arc.name || arc.seasonKey)}')">🔍 Search All</button>
+                <button class="btn" title="Search for all episodes" onclick="openSearchModal('${escapeHtml(arc.chapterRange)}', '${escapeHtml(arc.name || arc.seasonKey)}')">🔍 Search</button>
+                <button class="btn btn-primary" title="Auto-download all available episodes" onclick="downloadAllEpisodes('${escapeHtml(arc.chapterRange)}', '${escapeHtml(arc.seasonKey)}', '${escapeHtml(arc.name || arc.seasonKey)}')">⬇️ Download All</button>
                 ${arc.downloadKey > 0 ? `
                 <button 
                     class="btn btn-success" 
-                    title="Download entire arc"
+                    title="Download entire arc as single torrent"
                     onclick="downloadTorrent(${arc.downloadKey}, '${escapeHtml(arc.name || arc.seasonKey)}')"
-                >⬇️ Download Arc</button>
+                >⬇️ Download Season Pack</button>
                 ` : ''}
             </div>
         </div>
@@ -313,10 +314,55 @@ function downloadTorrent(downloadKey, name) {
     });
 }
 
+function downloadAllEpisodes(range, seasonKey, name) {
+    if (!confirm(`Download all available episodes for ${name}?`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('range', range);
+    formData.append('seasonKey', seasonKey);
+    
+    showAlert('info', 'Searching for all episodes...');
+    
+    fetch('/api/arcs/download-all', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            showAlert('success', data.message || 'Episodes queued successfully');
+            refreshCurrentView();
+        } else {
+            showAlert('error', data.message || 'Failed to queue episodes');
+        }
+    })
+    .catch(err => {
+        console.error('Download all failed:', err);
+        showAlert('error', 'Failed to queue episodes: ' + err);
+    });
+}
+
 function showAlert(type, message) {
     const container = document.getElementById('toast-container');
-    const toastClass = type === 'success' ? 'toast-success' : 'toast-error';
-    const icon = type === 'success' ? '✓' : '✗';
+    let toastClass, icon;
+    
+    switch(type) {
+        case 'success':
+            toastClass = 'toast-success';
+            icon = '✓';
+            break;
+        case 'info':
+            toastClass = 'toast-info';
+            icon = 'ℹ';
+            break;
+        case 'error':
+        default:
+            toastClass = 'toast-error';
+            icon = '✗';
+            break;
+    }
     
     const toast = document.createElement('div');
     toast.className = `toast ${toastClass}`;
@@ -389,6 +435,20 @@ function showAlert(type, message) {
 .toast-error {
     background-color: #ef4444;
     color: white;
+}
+
+.toast-info {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.btn-primary {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #2563eb;
 }
 
 .toast-icon {

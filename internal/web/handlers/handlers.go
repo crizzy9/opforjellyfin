@@ -316,17 +316,25 @@ func APISearchArcs(w http.ResponseWriter, r *http.Request) {
 
 	torrents, err := scraper.FetchTorrents(cfg)
 	if err != nil {
+		logger.Log(true, "Failed to fetch torrents for search: %v", err)
 		http.Error(w, "Failed to fetch torrents", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Log(false, "Searching for torrents matching range: %s", rangeFilter)
+
 	var filtered []shared.TorrentEntry
 	for _, t := range torrents {
-		if rangeFilter != "" && strings.Contains(t.ChapterRange, rangeFilter) {
+		// Match exact chapter range or if the search range is contained within the torrent's range
+		if matchesChapterRange(t.ChapterRange, rangeFilter) {
+			logger.Log(false, "Found match: %s (range: %s)", t.TorrentName, t.ChapterRange)
 			filtered = append(filtered, t)
 		}
 	}
 
+	logger.Log(true, "Search for '%s' returned %d results", rangeFilter, len(filtered))
+
+	// Sort by quality (highest first), then by seeders
 	sort.Slice(filtered, func(i, j int) bool {
 		if filtered[i].Quality != filtered[j].Quality {
 			qi, _ := strconv.Atoi(strings.TrimSuffix(filtered[i].Quality, "p"))
@@ -338,6 +346,188 @@ func APISearchArcs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(filtered)
+}
+
+// matchesChapterRange checks if a torrent's chapter range matches the search filter
+// It handles exact matches, range overlaps, and single episode matches
+func matchesChapterRange(torrentRange, searchRange string) bool {
+	if torrentRange == "" || searchRange == "" {
+		return false
+	}
+
+	// Normalize dashes
+	torrentRange = shared.NormalizeDash(torrentRange)
+	searchRange = shared.NormalizeDash(searchRange)
+
+	// Exact match
+	if torrentRange == searchRange {
+		return true
+	}
+
+	// Parse ranges
+	tStart, tEnd := shared.ParseRange(torrentRange)
+	sStart, sEnd := shared.ParseRange(searchRange)
+
+	// If parsing failed, try simple contains
+	if tStart == -1 || sStart == -1 {
+		return strings.Contains(torrentRange, searchRange)
+	}
+
+	// Check if ranges overlap or match
+	// Torrent contains the search range
+	if tStart <= sStart && tEnd >= sEnd {
+		return true
+	}
+
+	// Search range contains the torrent (for searching full seasons)
+	if sStart <= tStart && sEnd >= tEnd {
+		return true
+	}
+
+	return false
+}
+
+func APISearchAndDownloadAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Method not allowed",
+		})
+		return
+	}
+
+	rangeFilter := r.FormValue("range")
+	seasonKey := r.FormValue("seasonKey")
+
+	if rangeFilter == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Range parameter required",
+		})
+		return
+	}
+
+	cfg := shared.LoadConfig()
+	if cfg.TargetDir == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Target directory not set",
+		})
+		return
+	}
+
+	torrents, err := scraper.FetchTorrents(cfg)
+	if err != nil {
+		logger.Log(true, "Error fetching torrents: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "Failed to fetch torrents",
+		})
+		return
+	}
+
+	// First try to find a full season torrent
+	var fullSeasonTorrent *shared.TorrentEntry
+	for i := range torrents {
+		t := &torrents[i]
+		if matchesChapterRange(t.ChapterRange, rangeFilter) && t.ChapterRange == rangeFilter {
+			if fullSeasonTorrent == nil || t.Seeders > fullSeasonTorrent.Seeders {
+				fullSeasonTorrent = t
+			}
+		}
+	}
+
+	queuedCount := 0
+
+	if fullSeasonTorrent != nil {
+		// Found full season, download it
+		logger.Log(true, "Found full season torrent for %s: %s", rangeFilter, fullSeasonTorrent.TorrentName)
+		torrentURL := fmt.Sprintf("%s/download/%d.torrent", cfg.Source.BaseURL, fullSeasonTorrent.TorrentID)
+
+		if err := downloader.QueueDownload(fullSeasonTorrent, torrentURL, cfg); err != nil {
+			logger.Log(true, "Failed to queue full season: %v", err)
+		} else {
+			queuedCount++
+		}
+	} else {
+		// No full season found, try to download individual episodes
+		logger.Log(true, "No full season found for %s, searching for individual episodes", rangeFilter)
+
+		// Get episode list from metadata
+		index := metadata.LoadMetadataCache()
+		if index == nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]any{
+				"success": false,
+				"message": "Metadata cache not loaded",
+			})
+			return
+		}
+
+		// Find the season
+		var season *shared.SeasonIndex
+		for key, s := range index.Seasons {
+			if key == seasonKey || s.Range == rangeFilter {
+				season = &s
+				break
+			}
+		}
+
+		if season == nil {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]any{
+				"success": false,
+				"message": "Season not found in metadata",
+			})
+			return
+		}
+
+		// Build map of available torrents by chapter range
+		torrentMap := make(map[string]*shared.TorrentEntry)
+		for i := range torrents {
+			t := &torrents[i]
+			if existing, ok := torrentMap[t.ChapterRange]; !ok || t.Seeders > existing.Seeders {
+				torrentMap[t.ChapterRange] = t
+			}
+		}
+
+		// Queue each episode
+		for epRange := range season.EpisodeRange {
+			if torrent, ok := torrentMap[epRange]; ok {
+				torrentURL := fmt.Sprintf("%s/download/%d.torrent", cfg.Source.BaseURL, torrent.TorrentID)
+				if err := downloader.QueueDownload(torrent, torrentURL, cfg); err != nil {
+					logger.Log(true, "Failed to queue episode %s: %v", epRange, err)
+				} else {
+					queuedCount++
+					logger.Log(false, "Queued episode: %s", torrent.TorrentName)
+				}
+			} else {
+				logger.Log(true, "No torrent found for episode range: %s", epRange)
+			}
+		}
+	}
+
+	InvalidateArcsCache()
+
+	if queuedCount == 0 {
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": "No torrents found to download",
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"success": true,
+		"message": fmt.Sprintf("Queued %d torrent(s) for download", queuedCount),
+		"count":   queuedCount,
+	})
 }
 
 func APIDownloadArc(w http.ResponseWriter, r *http.Request) {

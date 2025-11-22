@@ -98,6 +98,7 @@ func TestConnection(cfg shared.TorrentClientConfig) (string, error) {
 
 func ImportCompletedDownload(td *shared.TorrentDownload, status *client.TorrentStatus, cfg shared.Config) error {
 	if td.Imported {
+		logger.Log(false, "Skipping import - already imported: %s", td.Title)
 		return nil
 	}
 
@@ -109,20 +110,28 @@ func ImportCompletedDownload(td *shared.TorrentDownload, status *client.TorrentS
 	td.PlacementProgress = "🔗 Importing files..."
 	shared.SaveTorrentDownload(td)
 
-	logger.Log(false, "Importing completed download from: %s", status.SavePath)
+	logger.Log(true, "🔄 Starting import for: %s from %s", td.Title, status.SavePath)
 
 	index := metadata.LoadMetadataCache()
 	if index == nil {
+		logger.Log(true, "❌ Failed to import %s: metadata cache not loaded", td.Title)
 		return fmt.Errorf("metadata cache not loaded")
 	}
 
+	// Process the files and check if any were placed
 	matcher.ProcessTorrentFiles(status.SavePath, cfg.TargetDir, td, index)
 
-	td.Imported = true
-	td.Placed = true
-	td.Done = true
-	shared.SaveTorrentDownload(td)
+	// Only mark as imported and placed if files were actually placed
+	if len(td.PlacementFull) > 0 {
+		td.Imported = true
+		td.Placed = true
+		td.Done = true
+		logger.Log(true, "✅ Successfully imported %d file(s) for: %s", len(td.PlacementFull), td.Title)
+	} else {
+		logger.Log(true, "⚠️  Warning: No files were placed for: %s", td.Title)
+		td.PlacementProgress = "⚠️ No files placed"
+	}
 
-	logger.Log(false, "Successfully imported: %s", td.Title)
+	shared.SaveTorrentDownload(td)
 	return nil
 }

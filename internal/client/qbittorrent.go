@@ -87,6 +87,9 @@ func (q *QBittorrentClient) AddTorrent(ctx context.Context, torrentURL string, s
 		writer.WriteField("savepath", savePath)
 	}
 	writer.WriteField("category", "OnePace")
+	// Set seed ratio limit to 0.6 (remove after reaching 60% ratio)
+	writer.WriteField("ratioLimit", "0.6")
+	writer.WriteField("seedingTimeLimit", "-1") // No time limit, only ratio
 
 	writer.Close()
 

@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // Matches video-file to metadata, then places it
@@ -17,91 +16,69 @@ import (
 func MatchAndPlaceVideo(videoPath, defaultDir string, index *shared.MetadataIndex, ogcr string) (string, error) {
 
 	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
+		logger.Log(true, "   ❌ Video file does not exist: %s", videoPath)
 		return "", nil
 	}
 
-	logger.Log(false, "Checking if video file exists: %s", videoPath)
 	fileName := filepath.Base(videoPath)
-	logger.Log(false, "Placing filename : %s", fileName)
+	logger.Log(false, "   🔍 Attempting to match: %s (chapter range: %s)", fileName, ogcr)
 
 	// strict
 	dstPathNoSuffix := findMetadataMatch(fileName, index, ogcr)
 
-	logger.Log(false, "dstPath for fileName %s will be %s", fileName, dstPathNoSuffix)
+	if dstPathNoSuffix == "" {
+		logger.Log(true, "   ❌ No metadata match found for: %s", fileName)
+		return "", fmt.Errorf("no metadata match found for file: %s (chapter range: %s)", fileName, ogcr)
+	}
+
+	logger.Log(false, "   📍 Target path (no ext): %s", dstPathNoSuffix)
 
 	// extract suffix from original file
 	ext := filepath.Ext(fileName)
 	finalPath := dstPathNoSuffix + ext
 
-	var msg string
-
 	// SafeMoveFile now handles all locking internally
 	if err := shared.SafeMoveFile(videoPath, finalPath); err != nil {
-		logger.Log(false, "sfm Error: %s, moving to strayvideos", err)
-
-		// Create strayvideos directory using the thread-safe function
-		strayDir := filepath.Join(defaultDir, "strayvideos")
-		if err := shared.CreateDirectory(strayDir); err != nil {
-			logger.Log(true, "Failed to create strayvideos directory: %v", err)
-			return "", fmt.Errorf("failed to create strayvideos: %w", err)
-		}
-
-		// Add timestamp to filename to avoid collisions
-		nameWithoutExt := strings.TrimSuffix(fileName, ext)
-		timestamp := time.Now().Format("20060102-150405")
-		strayFileName := fmt.Sprintf("%s_%s%s", nameWithoutExt, timestamp, ext)
-		strayPath := filepath.Join(strayDir, strayFileName)
-
-		// SafeMoveFile handles locking
-		if err := shared.SafeMoveFile(videoPath, strayPath); err != nil {
-			logger.Log(true, "Failed to move to strayvideos: %v", err)
-			return "", fmt.Errorf("failed to place file anywhere: %w", err)
-		}
-
-		// Format message for strayvideos
-		outFileName := ui.AnsiPadRight(fileName, 26, "..")
-		outRelPath := ui.AnsiPadRight("strayvideos/"+strayFileName, 36, "..")
-		msg = fmt.Sprintf("⚠️  Placed in stray: %s → %s", outFileName, outRelPath)
-
-	} else {
-		//relative path for logs
-		relPath, _ := filepath.Rel(defaultDir, finalPath)
-		//debug
-		logger.Log(false, "%s", fmt.Sprintf("placed: %s → %s", fileName, relPath))
-
-		// some formatting
-		fileNameNoPrefix := fileName
-		if len(fileName) > 10 {
-			fileNameNoPrefix = fileName[10:]
-		}
-		relPathNoPrefix := filepath.Base(relPath)
-		if len(relPathNoPrefix) > 10 {
-			relPathNoPrefix = relPathNoPrefix[10:]
-		}
-		outFileName := ui.AnsiPadRight(fileNameNoPrefix, 26, "..")
-		outRelPath := ui.AnsiPadRight(".."+relPathNoPrefix, 36, "..")
-		msg = fmt.Sprintf("🎞️  Placed: %s → %s", outFileName, outRelPath)
+		logger.Log(true, "   ❌ Failed to place file to target location: %s", err)
+		return "", fmt.Errorf("failed to place %s to %s: %w", fileName, finalPath, err)
 	}
+
+	//relative path for logs
+	relPath, _ := filepath.Rel(defaultDir, finalPath)
+	//debug
+	logger.Log(false, "%s", fmt.Sprintf("placed: %s → %s", fileName, relPath))
+
+	// some formatting
+	fileNameNoPrefix := fileName
+	if len(fileName) > 10 {
+		fileNameNoPrefix = fileName[10:]
+	}
+	relPathNoPrefix := filepath.Base(relPath)
+	if len(relPathNoPrefix) > 10 {
+		relPathNoPrefix = relPathNoPrefix[10:]
+	}
+	outFileName := ui.AnsiPadRight(fileNameNoPrefix, 26, "..")
+	outRelPath := ui.AnsiPadRight(".."+relPathNoPrefix, 36, "..")
+	msg := fmt.Sprintf("🎞️  Placed: %s → %s", outFileName, outRelPath)
 
 	return msg, nil
 }
 
 // returns directory to place file, without suffix
+// Returns empty string if no match found
 func findMetadataMatch(fileName string, index *shared.MetadataIndex, ogcr string) string {
 
 	cfg := shared.LoadConfig()
 	baseDir := cfg.TargetDir
 
-	// strayfolder for unmatched videos
-	strayfolder := filepath.Join(baseDir, "strayvideos", ogcr, fileName)
 	// finds season containing chapterRange, returns the seasonFolderName and seasonIndex
 	// uses ogcr to find correct season even if its a bundle
 	seasonFolderName, seasonIndex := findSeasonForChapter(ogcr, index)
 	if seasonFolderName == "" {
-		logger.Log(false, "findMetaDataMatch: failed to find Season-folder")
-		return strayfolder
+		logger.Log(true, "   ❌ findMetaDataMatch: failed to find Season-folder for range %s", ogcr)
+		return ""
 	}
-	logger.Log(false, "season found for: %s for range %s", seasonFolderName, ogcr)
+	logger.Log(false, "   ✓ Season found: %s for range %s", seasonFolderName, ogcr)
 
 	// searches the seasonIndex for matching title for chapterRange, tries ogcr first for single-episode seasons
 	newFileName := findTitleForChapter(ogcr, seasonIndex)
@@ -109,7 +86,7 @@ func findMetadataMatch(fileName string, index *shared.MetadataIndex, ogcr string
 		// if first fails, extract specific chapterRange from fileName
 		chapterRange := shared.ExtractChapterRangeFromTitle(fileName)
 		if chapterRange == "" {
-			logger.Log(false, "findMetaDataMatch - trying rough extraction for: %s", fileName)
+			logger.Log(false, "   → Trying rough extraction for: %s", fileName)
 			// use ogcr + file regex
 			// if this extraction fails, try rougher methods
 			seasonZ := shared.ExtractSeasonNumber(seasonFolderName)
@@ -117,7 +94,7 @@ func findMetadataMatch(fileName string, index *shared.MetadataIndex, ogcr string
 
 			// rough extract can find chapterRange or rough chapter(in relation to season) if lucky.
 			chapterNum, isRange := shared.RoughExtractChapterFromTitle(fileName)
-			logger.Log(false, "findMetaDataMatch - rough extracted chapterNum: %s", chapterNum)
+			logger.Log(false, "   → Rough extracted chapterNum: %s", chapterNum)
 
 			if isRange {
 				newFileName = findTitleForChapter(chapterNum, seasonIndex)
@@ -131,18 +108,18 @@ func findMetadataMatch(fileName string, index *shared.MetadataIndex, ogcr string
 			newFileName = findTitleForChapter(chapterRange, seasonIndex)
 		}
 	} else {
-		logger.Log(false, "Title match found: ChapterKey: %s - EpisodeTitle: %s", ogcr, fileName)
+		logger.Log(false, "   ✓ Title match found: ChapterKey: %s - EpisodeTitle: %s", ogcr, newFileName)
+	}
+
+	if newFileName == "" {
+		logger.Log(true, "   ❌ Could not determine episode title for file: %s", fileName)
+		return ""
 	}
 
 	seasonDir := filepath.Join(baseDir, seasonFolderName)
-
-	if newFileName == "" {
-		logger.Log(false, "Could not determine episode title, sending to stray")
-		return strayfolder
-	}
 	fullPathNoSuffix := filepath.Join(seasonDir, newFileName)
 
-	logger.Log(false, "findMetaDataMatch: returning %s", fullPathNoSuffix)
+	logger.Log(false, "   → Target: %s", fullPathNoSuffix)
 	return fullPathNoSuffix
 }
 

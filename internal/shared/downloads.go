@@ -74,3 +74,25 @@ func (td *TorrentDownload) MarkPlaced(msg string) {
 	td.Placed = true
 	SaveTorrentDownload(td)
 }
+
+// RemoveDownload removes a specific download from the active list
+func RemoveDownload(torrentID int) {
+	mu.Lock()
+	defer mu.Unlock()
+	delete(activeDownloads, torrentID)
+}
+
+// CleanupCompletedDownloads removes downloads that are imported and placed
+func CleanupCompletedDownloads() int {
+	mu.Lock()
+	defer mu.Unlock()
+
+	removed := 0
+	for id, td := range activeDownloads {
+		if td.Imported && td.Placed && td.Done {
+			delete(activeDownloads, id)
+			removed++
+		}
+	}
+	return removed
+}

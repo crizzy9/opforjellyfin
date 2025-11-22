@@ -95,6 +95,12 @@ func (w *Worker) checkAndImportDownloads() {
 		}
 	}
 
+	// Clean up completed downloads after import
+	removed := shared.CleanupCompletedDownloads()
+	if removed > 0 {
+		logger.Log(true, "Worker: Cleaned up %d completed download(s) from activity list", removed)
+	}
+
 	if hasImports && w.onImportCallback != nil {
 		w.onImportCallback()
 	}

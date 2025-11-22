@@ -53,6 +53,7 @@ func StartServer(port int) error {
 	mux.HandleFunc("/api/arcs/details", handlers.APIGetArcDetails)
 	mux.HandleFunc("/api/arcs/search", handlers.APISearchArcs)
 	mux.HandleFunc("/api/arcs/download", handlers.APIDownloadArc)
+	mux.HandleFunc("/api/arcs/download-all", handlers.APISearchAndDownloadAll)
 	mux.HandleFunc("/api/settings/update", handlers.APIUpdateSettings)
 	mux.HandleFunc("/api/settings/test-client", handlers.APITestClient)
 	mux.HandleFunc("/api/settings/browse", handlers.APIBrowseDirectories)

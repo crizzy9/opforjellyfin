@@ -423,6 +423,12 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
+.files-placed-count {
+    margin-left: 8px;
+    color: var(--success-color);
+    font-weight: 500;
+}
+
 .badge {
     display: inline-block;
     padding: 4px 8px;

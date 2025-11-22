@@ -82,7 +82,12 @@ function renderActivity(data) {
                     </div>
                 </div>
                 ${dl.PlacementProgress ? `
-                    <div class="activity-status">${dl.PlacementProgress}</div>
+                    <div class="activity-status">
+                        ${dl.PlacementProgress}
+                        ${dl.PlacementFull && dl.PlacementFull.length > 0 ? `
+                            <span class="files-placed-count">(${dl.PlacementFull.length} file${dl.PlacementFull.length !== 1 ? 's' : ''} placed)</span>
+                        ` : ''}
+                    </div>
                 ` : ''}
             </div>
         `;
