@@ -1,22 +1,14 @@
 # Things
-## TODO
-- [x] Make it selfhostable
-- [x] build a UI
-- [x] Allow downloading via a torrent client
-- [x] Testing
-- [x] Download changes in the UI
-- [x] List changes in the UI
-- [x] Download directory setup via torrent client
-- [x] Download testing (pass)
-- [x] Browser caching or database
-- [x] Torrent connectivity
-  - [x] Qbittorrent
-  - [ ] Transmission (Untested)
-  - [ ] Deluge (Untested)
-- [x] Activity tab not auto polling % not working after refresh
-- [x] Hardlinking like sonarr (import working)
-- [x] hardlinking confirmation like sonarr (not actually working, once deleted from qbittorrent with also delete content files it doesnt delete it from the downloads folder and says permission denied and when tried manually, should auto delete once seed ratio is reached as well)
 
+## Prompt
+There are some major issues in the opforjellyfin repository that need to be addressed
+- Import of the video after download is not happening correctly. it takes the same video and imports it for all episodes. Each episodes must be imported separately making sure the right episode is being imported
+- Currently in the UI there is no option for sub and dub based downloads. Lets add a new settings option for this at the global level and make sure we always adhere to it. When doing a search it should show if its a sub or dub based download and allow the user to filter based on it, along with the quality of the video 720p 1080p etc
+
+
+## TODO
+
+- [-] Add options for Sub and Dub w/o sub for downloads as settings for search
 - [-] seasons are not getting imported correctly (single episodes are but not the entire season) it says imported but it did not actually get imported
 - [-] items from activity list should be removed once the import is complete and a default seed ratio of 0.6 should be assigned to downloads so theyll be gone from the downloads folder once it is reached
 - [-] episode search is not working correctly (not finding items even when its there it should look for One Pace and episode numbers like `One Pace 304-306`)
@@ -26,7 +18,7 @@
 - [-] remove stray videos logic and fail the import if no matches
 
 - [ ] metadata for each season and episode must be inserted when downloading only
-- [ ] some episodes still showing as [One Pace something something in jellyfin repeated ones. They need to be removed somehow
+- [ ] some episodes still showing as One Pace something something in jellyfin repeated ones. They need to be removed somehow
 - [ ] remove download and allow setting a prefered resolution and then just do search and auto search
 
 - [ ] UI overhaul
@@ -65,6 +57,23 @@
   - [ ] allow adding a custom seed ratio (default is 0.6)
   - [ ] clear all functionality to start from top
 
+
+- [x] Make it selfhostable
+- [x] build a UI
+- [x] Allow downloading via a torrent client
+- [x] Testing
+- [x] Download changes in the UI
+- [x] List changes in the UI
+- [x] Download directory setup via torrent client
+- [x] Download testing (pass)
+- [x] Browser caching or database
+- [x] Torrent connectivity
+  - [x] Qbittorrent
+  - [ ] Transmission (Untested)
+  - [ ] Deluge (Untested)
+- [x] Activity tab not auto polling % not working after refresh
+- [x] Hardlinking like sonarr (import working)
+- [x] hardlinking confirmation like sonarr (not actually working, once deleted from qbittorrent with also delete content files it doesnt delete it from the downloads folder and says permission denied and when tried manually, should auto delete once seed ratio is reached as well)
 
 ## Notes
   jellyfin theme > Dashboard > General > Custom CSS code > `@import url('https://cdn.jsdelivr.net/gh/stpnwf/ZestyTheme@latest/theme.css');`

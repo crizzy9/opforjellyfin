@@ -104,6 +104,7 @@ func parseRow(s *goquery.Selection, config *shared.ScraperConfig, baseURL string
 	rawIndex := extractRawIndex(chapterRange)
 	seeders, _ := strconv.Atoi(strings.TrimSpace(seedersStr))
 	quality := parseQuality(title)
+	audio := parseAudio(title)
 	torrentName := extractTorrentName(title)
 
 	// Make torrent link absolute if needed
@@ -120,6 +121,7 @@ func parseRow(s *goquery.Selection, config *shared.ScraperConfig, baseURL string
 	return shared.TorrentEntry{
 		Title:         title,
 		Quality:       quality,
+		Audio:         audio,
 		TorrentName:   torrentName,
 		Seeders:       seeders,
 		RawIndex:      rawIndex,
@@ -215,4 +217,17 @@ func extractTorrentName(title string) string {
 		}
 	}
 	return "Unknown"
+}
+
+// parseAudio returns audio type based on title string
+func parseAudio(title string) string {
+	title = strings.ToLower(title)
+
+	if strings.Contains(title, "dual audio") || (strings.Contains(title, "dub") && strings.Contains(title, "sub")) {
+		return "Dual"
+	}
+	if strings.Contains(title, "dub") {
+		return "Dub"
+	}
+	return "Sub" // Default to Sub if not specified, as One Pace is primarily subbed
 }

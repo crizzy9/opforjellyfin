@@ -1,0 +1,47 @@
+package components
+
+templ Layout(page string, contents templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>OpforJellyfin - One Pace Manager</title>
+		<link rel="stylesheet" href="/static/style.css?v=2"/>
+		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+	</head>
+	<body>
+		<div class="container">
+			<aside class="sidebar">
+				<div class="logo">🏴‍☠️ OpforJellyfin</div>
+				<nav>
+					<ul class="nav-menu">
+						<li class="nav-item">
+							<a href="/arcs" class={ activeClass(page == "arcs") }>📚 Arcs</a>
+						</li>
+						<li class="nav-item">
+							<a href="/activity" class={ activeClass(page == "activity") }>📊 Activity</a>
+						</li>
+						<li class="nav-item">
+							<a href="/settings" class={ activeClass(page == "settings") }>⚙️ Settings</a>
+						</li>
+						<li class="nav-item">
+							<a href="/system" class={ activeClass(page == "system") }>🔧 System</a>
+						</li>
+					</ul>
+				</nav>
+			</aside>
+			<main class="main-content">
+				@contents
+			</main>
+		</div>
+	</body>
+	</html>
+}
+
+func activeClass(isActive bool) string {
+	if isActive {
+		return "active"
+	}
+	return ""
+}

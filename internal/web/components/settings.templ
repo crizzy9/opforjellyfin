@@ -1,0 +1,199 @@
+package components
+
+import "opforjellyfin/internal/shared"
+
+templ SettingsPage(cfg shared.Config) {
+	<div class="header">
+		<h1>Settings</h1>
+	</div>
+
+	<div class="card">
+		<h2 style="margin-bottom: 20px;">General Settings</h2>
+		<form hx-post="/api/settings/update" hx-target="#settings-alert" hx-swap="innerHTML">
+			<div class="form-group">
+				<label for="targetDir">Target Directory (Media Library)</label>
+				<div style="display: flex; gap: 10px;">
+					<input 
+						type="text" 
+						id="targetDir" 
+						name="targetDir" 
+						value={ cfg.TargetDir }
+						placeholder="/data/media/One Piece/One Pace"
+						required
+						style="flex: 1;"
+					/>
+					<button 
+						type="button" 
+						class="btn" 
+						onclick="showDirectoryBrowser('targetDir')"
+					>
+						📁 Browse
+					</button>
+				</div>
+				<small style="color: var(--secondary-text);">
+					Final destination where One Pace episodes will be organized. This is where Jellyfin/Plex will read files from.
+				</small>
+			</div>
+
+			<div class="form-group">
+				<label for="subDubMode">Audio Preference</label>
+				<select id="subDubMode" name="subDubMode">
+					<option value="All" selected?={ cfg.SubDubMode == "All" }>All Audio (Sub & Dub)</option>
+					<option value="Sub" selected?={ cfg.SubDubMode == "Sub" }>Sub Only (Japanese Audio)</option>
+					<option value="Dub" selected?={ cfg.SubDubMode == "Dub" }>Dub Only (English Audio)</option>
+					<option value="Dual" selected?={ cfg.SubDubMode == "Dual" }>Dual Audio Only</option>
+				</select>
+				<small style="color: var(--secondary-text);">
+					Filtering preference for search results. 'Sub' will show Sub and Dual Audio. 'Dub' will show Dub and Dual Audio.
+				</small>
+			</div>
+
+			<button type="submit" class="btn btn-success">💾 Save Settings</button>
+		</form>
+	</div>
+
+	<div id="directory-browser" style="display: none; margin-top: 20px;" class="card">
+		<h3 style="margin-bottom: 15px;">Browse Directories</h3>
+		<div style="margin-bottom: 15px;">
+			<strong>Current Path:</strong> <span id="current-path">/</span>
+		</div>
+		<div id="directory-list" style="max-height: 400px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 5px;">
+			<!-- Directory list will be populated here by JS -->
+		</div>
+		<div style="display: flex; gap: 10px;">
+			<button type="button" class="btn btn-success" onclick="selectCurrentDirectory()">✓ Select This Directory</button>
+			<button type="button" class="btn" onclick="hideDirectoryBrowser()">✕ Cancel</button>
+		</div>
+	</div>
+
+	<div class="card" style="margin-top: 20px;">
+		<h2 style="margin-bottom: 20px;">Torrent Client Settings</h2>
+		<form hx-post="/api/settings/update" hx-target="#client-alert" hx-swap="innerHTML">
+			<div class="form-group">
+				<label for="clientType">Client Type</label>
+				<select id="clientType" name="clientType">
+					<option value="internal" selected?={ cfg.TorrentClient.Type == "" || cfg.TorrentClient.Type == "internal" }>Internal Client</option>
+					<option value="qbittorrent" selected?={ cfg.TorrentClient.Type == "qbittorrent" }>qBittorrent</option>
+					<option value="deluge" selected?={ cfg.TorrentClient.Type == "deluge" }>Deluge</option>
+					<option value="transmission" selected?={ cfg.TorrentClient.Type == "transmission" }>Transmission</option>
+				</select>
+			</div>
+
+			<div class="form-group">
+				<label for="clientUrl">Client URL</label>
+				<input 
+					type="text" 
+					id="clientUrl" 
+					name="clientUrl" 
+					value={ cfg.TorrentClient.URL }
+					placeholder="http://localhost:8080"
+				/>
+			</div>
+
+			<div class="form-group">
+				<label for="clientUsername">Username</label>
+				<input 
+					type="text" 
+					id="clientUsername" 
+					name="clientUsername" 
+					value={ cfg.TorrentClient.Username }
+					placeholder="admin"
+				/>
+			</div>
+
+			<div class="form-group">
+				<label for="clientPassword">Password</label>
+				<input 
+					type="password" 
+					id="clientPassword" 
+					name="clientPassword"
+					value={ cfg.TorrentClient.Password }
+				/>
+				<small style="color: var(--secondary-text);">Leave blank to keep existing password</small>
+			</div>
+
+			<button 
+				type="button" 
+				class="btn" 
+				hx-post="/api/settings/test-client"
+				hx-target="#client-test-result"
+				hx-swap="innerHTML"
+			>
+				🧪 Test Connection
+			</button>
+			<button type="submit" class="btn btn-success">💾 Save Client Settings</button>
+			
+			<div id="client-test-result" style="margin-top: 15px;"></div>
+		</form>
+		
+		<div id="client-alert" style="margin-top: 20px;"></div>
+	</div>
+
+	<div id="settings-alert" style="margin-top: 20px;"></div>
+	
+	@SettingsScript()
+}
+
+templ SettingsScript() {
+	<script>
+	let currentBrowsePath = '/data';
+	let currentBrowseField = 'targetDir';
+
+	function showDirectoryBrowser(fieldId) {
+		currentBrowseField = fieldId;
+		document.getElementById('directory-browser').style.display = 'block';
+		const fieldValue = document.getElementById(fieldId).value;
+		if (fieldValue) {
+			currentBrowsePath = fieldValue;
+		}
+		browseDirectory(currentBrowsePath);
+	}
+
+	function hideDirectoryBrowser() {
+		document.getElementById('directory-browser').style.display = 'none';
+	}
+
+	function selectCurrentDirectory() {
+		document.getElementById(currentBrowseField).value = currentBrowsePath;
+		hideDirectoryBrowser();
+	}
+
+	function browseDirectory(path) {
+		currentBrowsePath = path;
+		
+		fetch('/api/settings/browse?path=' + encodeURIComponent(path))
+			.then(response => response.json())
+			.then(data => {
+				document.getElementById('current-path').textContent = data.currentPath;
+				
+				const listHtml = data.directories.map(dir => `
+					<div 
+						style="padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; gap: 10px;"
+						onclick="browseDirectory('${dir.path.replace(/'/g, "\\'")}')"
+						onmouseover="this.style.backgroundColor='var(--accent-bg)'"
+						onmouseout="this.style.backgroundColor='transparent'"
+					>
+						<span style="font-size: 20px;">📁</span>
+						<span>${escapeHtml(dir.name)}</span>
+					</div>
+				`).join('');
+				
+				document.getElementById('directory-list').innerHTML = listHtml || '<p style="text-align: center; color: var(--secondary-text); padding: 20px;">No subdirectories found</p>';
+			})
+			.catch(error => {
+				document.getElementById('directory-list').innerHTML = `
+					<div class="alert alert-danger" style="margin: 10px;">
+						❌ Failed to browse directory: ${error.message}
+					</div>
+				`;
+			});
+	}
+
+	function escapeHtml(text) {
+		if(!text) return '';
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+	</script>
+}

@@ -10,6 +10,25 @@ type Config struct {
 	GitHubRepo    string              `json:"github_base_url"`
 	Source        ScraperConfig       `json:"source"`
 	TorrentClient TorrentClientConfig `json:"torrent_client"`
+	SubDubMode    string              `json:"sub_dub_mode"` // "All", "Sub", "Dub", "Dual"
+}
+
+type ArcStatus struct {
+	Name         string `json:"name"`
+	SeasonKey    string `json:"seasonKey"`
+	SeasonNumber int    `json:"seasonNumber"`
+	ChapterRange string `json:"chapterRange"`
+	HasMetadata  bool   `json:"hasMetadata"`
+	VideoStatus  int    `json:"videoStatus"`
+	EpisodeCount int    `json:"episodeCount"`
+	DownloadKey  int    `json:"downloadKey"`
+}
+
+type EpisodeStatus struct {
+	Title        string `json:"title"`
+	ChapterRange string `json:"chapterRange"`
+	HasVideo     bool   `json:"hasVideo"`
+	DownloadKey  int    `json:"downloadKey"`
 }
 
 type TorrentClientConfig struct {
@@ -85,6 +104,7 @@ type TorrentDownload struct {
 type TorrentEntry struct {
 	Title         string // full title
 	Quality       string // parsed quality
+	Audio         string // parsed audio (Sub, Dub, Dual)
 	DownloadKey   int    // download key set by rawIndex
 	TorrentName   string // for display
 	Seeders       int    // number of seeders

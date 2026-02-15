@@ -1,0 +1,357 @@
+package components
+
+import (
+	"fmt"
+	"opforjellyfin/internal/shared"
+	"strconv"
+)
+
+templ ArcsPage() {
+	<div class="header">
+		<h1 id="page-title">One Pace Arcs</h1>
+		<div>
+			<button id="back-button" class="btn" style="display: none;" 
+				hx-get="/api/arcs/list" 
+				hx-target="#arcs-content" 
+				hx-swap="innerHTML">
+				← Back to Arcs
+			</button>
+			<button class="btn" onclick="location.reload()">
+				🔄 Refresh
+			</button>
+		</div>
+	</div>
+
+	<div id="arcs-content" 
+	     hx-get="/api/arcs/list" 
+	     hx-trigger="load"
+	     hx-swap="innerHTML">
+		<div class="spinner"></div>
+	</div>
+	
+	<div id="toast-container"></div>
+	<div id="search-modal" class="modal" style="display: none;">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h2 id="search-modal-title">Search Results</h2>
+				<button class="modal-close" onclick="closeSearchModal()">✕</button>
+			</div>
+			<div id="search-results" class="modal-body">
+				<div class="spinner"></div>
+			</div>
+		</div>
+	</div>
+	
+	@ArcsScript()
+}
+
+templ ArcsList(arcs []shared.ArcStatus) {
+	if len(arcs) == 0 {
+		<div class="empty-state">
+			<div class="empty-state-icon">📭</div>
+			<h3>No arcs found</h3>
+			<p>Run sync in System settings to fetch metadata</p>
+		</div>
+	} else {
+		<div class="arcs-table-container">
+			<table class="arcs-table">
+				<thead>
+					<tr>
+						<th>Arc Name</th>
+						<th>Chapter Range</th>
+						<th>Episodes</th>
+						<th class="text-center">Metadata</th>
+						<th class="text-center">Status</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, arc := range arcs {
+						<tr class="arc-row" 
+							hx-get={ fmt.Sprintf("/api/arcs/details?seasonKey=%s", arc.SeasonKey) }
+							hx-target="#arcs-content"
+							hx-swap="innerHTML">
+							<td class="arc-name">
+								<strong>{ arc.Name }</strong>
+								if arc.SeasonNumber > 0 {
+									<span class="season-number">{ fmt.Sprintf("Season %d", arc.SeasonNumber) }</span>
+								}
+							</td>
+							<td class="arc-range">{ arc.ChapterRange }</td>
+							<td class="arc-episodes">{ fmt.Sprintf("%d episodes", arc.EpisodeCount) }</td>
+							<td class="text-center">
+								if arc.HasMetadata {
+									<span class="status-icon status-complete" title="Metadata available">📋</span>
+								} else {
+									<span class="status-icon status-missing" title="No metadata">📋</span>
+								}
+							</td>
+							<td class="text-center">
+								switch arc.VideoStatus {
+									case 0:
+										<span class="status-icon status-missing" title="No episodes downloaded">✗</span>
+									case 1:
+										<span class="status-icon status-partial" title="Some episodes downloaded">⚠</span>
+									case 2:
+										<span class="status-icon status-complete" title="All episodes downloaded">✓</span>
+									default:
+										<span class="status-icon status-missing">?</span>
+								}
+							</td>
+							<td class="arc-actions-cell" onclick="event.stopPropagation()">
+								<button class="btn-icon" title="Search for arc" 
+									onclick={ templ.ComponentScript{ Call: fmt.Sprintf("openSearchModal('%s', '%s')", arc.ChapterRange, arc.Name) } }>
+									🔍
+								</button>
+								if arc.DownloadKey > 0 {
+									<button 
+										class="btn-icon" 
+										title="Download arc"
+										onclick={ templ.ComponentScript{ Call: fmt.Sprintf("downloadTorrent(%d, '%s')", arc.DownloadKey, arc.Name) } }>
+										⬇️
+									</button>
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<script>
+			document.getElementById('back-button').style.display = 'none';
+			document.getElementById('page-title').textContent = 'One Pace Arcs';
+		</script>
+	}
+}
+
+templ ArcDetails(arc shared.ArcStatus, episodes []shared.EpisodeStatus) {
+	<div class="arc-details-header card">
+		<div class="arc-info">
+			<h2>{ arc.Name }</h2>
+			<p class="arc-meta-info">
+				<span>Chapter Range: { arc.ChapterRange }</span>
+				<span class="separator">•</span>
+				<span>{ fmt.Sprintf("%d episodes", arc.EpisodeCount) }</span>
+				<span class="separator">•</span>
+				switch arc.VideoStatus {
+					case 0:
+						<span class="status-icon status-missing" title="No episodes downloaded">✗</span>
+					case 1:
+						<span class="status-icon status-partial" title="Some episodes downloaded">⚠</span>
+					case 2:
+						<span class="status-icon status-complete" title="All episodes downloaded">✓</span>
+				}
+				<span> Status</span>
+			</p>
+		</div>
+		<div class="arc-actions">
+			<button class="btn" title="Search for all episodes" 
+				onclick={ templ.ComponentScript{ Call: fmt.Sprintf("openSearchModal('%s', '%s')", arc.ChapterRange, arc.Name) } }>
+				🔍 Search
+			</button>
+			<button class="btn btn-primary" title="Auto-download all available episodes" 
+				onclick={ templ.ComponentScript{ Call: fmt.Sprintf("downloadAllEpisodes('%s', '%s', '%s')", arc.ChapterRange, arc.SeasonKey, arc.Name) } }>
+				⬇️ Download All
+			</button>
+			if arc.DownloadKey > 0 {
+				<button 
+					class="btn btn-success" 
+					title="Download entire arc as single torrent"
+					onclick={ templ.ComponentScript{ Call: fmt.Sprintf("downloadTorrent(%d, '%s')", arc.DownloadKey, arc.Name) } }>
+					⬇️ Download Season Pack
+				</button>
+			}
+		</div>
+	</div>
+	
+	<div class="episodes-table-container">
+		<table class="arcs-table">
+			<thead>
+				<tr>
+					<th>Episode</th>
+					<th>Chapter Range</th>
+					<th class="text-center">Status</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, ep := range episodes {
+					<tr class="episode-row">
+						<td class="episode-title">{ ep.Title }</td>
+						<td class="episode-range">{ ep.ChapterRange }</td>
+						<td class="text-center">
+							if ep.HasVideo {
+								<span class="status-icon status-complete" title="Downloaded">✓</span>
+							} else {
+								<span class="status-icon status-missing" title="Not downloaded">✗</span>
+							}
+						</td>
+						<td class="episode-actions-cell">
+							<button class="btn-icon" title="Search for episode" 
+								onclick={ templ.ComponentScript{ Call: fmt.Sprintf("openSearchModal('%s', '%s')", ep.ChapterRange, ep.Title) } }>
+								🔍
+							</button>
+							if ep.DownloadKey > 0 {
+								<button 
+									class="btn-icon" 
+									title="Download episode"
+									onclick={ templ.ComponentScript{ Call: fmt.Sprintf("downloadTorrent(%d, '%s')", ep.DownloadKey, ep.Title) } }>
+									⬇️
+								</button>
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+	<script>
+		document.getElementById('back-button').style.display = 'inline-block';
+		document.getElementById('page-title').textContent = '{ arc.Name }';
+	</script>
+}
+
+templ SearchResults(torrents []shared.TorrentEntry) {
+	if len(torrents) == 0 {
+		<div class="empty-state">
+			<p>No torrents found for this range</p>
+		</div>
+	} else {
+		for _, t := range torrents {
+			<div class="search-result-item">
+				<div class="search-result-info">
+					<div class="search-result-title">{ t.TorrentName }</div>
+					<div class="search-result-meta">
+						<span>Quality: <strong>{ t.Quality }</strong></span>
+						<span>Audio: <strong>{ t.Audio }</strong></span>
+						<span>Seeders: <strong>{ strconv.Itoa(t.Seeders) }</strong></span>
+						<span>Range: { t.ChapterRange }</span>
+						<span>Date: { t.Date }</span>
+					</div>
+				</div>
+				<div class="search-result-actions">
+					<button 
+						class="btn btn-success"
+						onclick={ templ.ComponentScript{ Call: fmt.Sprintf("downloadTorrent(%d, '%s')", t.DownloadKey, t.TorrentName) } }>
+						⬇️ Download
+					</button>
+				</div>
+			</div>
+		}
+	}
+}
+
+templ ArcsScript() {
+	<script>
+	function openSearchModal(range, title) {
+		document.getElementById('search-modal-title').textContent = 'Search Results: ' + title;
+		document.getElementById('search-modal').style.display = 'flex';
+		document.getElementById('search-results').innerHTML = '<div class="spinner"></div>';
+		
+		fetch('/api/arcs/search?range=' + encodeURIComponent(range))
+			.then(response => response.text()) // Expecting HTML now
+			.then(html => {
+				document.getElementById('search-results').innerHTML = html;
+			})
+			.catch(err => {
+				console.error('Failed to search:', err);
+				document.getElementById('search-results').innerHTML = '<p>Failed to load search results</p>';
+			});
+	}
+
+	function closeSearchModal() {
+		document.getElementById('search-modal').style.display = 'none';
+	}
+
+	function downloadTorrent(downloadKey, name) {
+		const formData = new FormData();
+		formData.append('downloadKey', downloadKey);
+		
+		fetch('/api/arcs/download', {
+			method: 'POST',
+			body: formData
+		})
+		.then(response => response.json())
+		.then(data => {
+			if(data.success) {
+				showAlert('success', data.message || 'Download started successfully');
+				closeSearchModal();
+				// Refresh the current view
+				// htmx.trigger('#arcs-content', 'load'); // This might be too aggressive, ideally we refresh just the impacted parts
+			} else {
+				showAlert('error', 'Download failed: ' + (data.message || 'Unknown error'));
+			}
+		})
+		.catch(err => {
+			console.error('Download failed:', err);
+			showAlert('error', 'Download failed: ' + err);
+		});
+	}
+
+	function downloadAllEpisodes(range, seasonKey, name) {
+		if (!confirm(`Download all available episodes for ${name}?`)) {
+			return;
+		}
+		
+		const formData = new FormData();
+		formData.append('range', range);
+		formData.append('seasonKey', seasonKey);
+		
+		showAlert('info', 'Searching for all episodes...');
+		
+		fetch('/api/arcs/download-all', {
+			method: 'POST',
+			body: formData
+		})
+		.then(response => response.json())
+		.then(data => {
+			if(data.success) {
+				showAlert('success', data.message || 'Episodes queued successfully');
+			} else {
+				showAlert('error', data.message || 'Failed to queue episodes');
+			}
+		})
+		.catch(err => {
+			console.error('Download all failed:', err);
+			showAlert('error', 'Failed to queue episodes: ' + err);
+		});
+	}
+
+	function showAlert(type, message) {
+		const container = document.getElementById('toast-container');
+		let toastClass, icon;
+		
+		switch(type) {
+			case 'success':
+				toastClass = 'toast-success';
+				icon = '✓';
+				break;
+			case 'info':
+				toastClass = 'toast-info';
+				icon = 'ℹ';
+				break;
+			case 'error':
+			default:
+				toastClass = 'toast-error';
+				icon = '✗';
+				break;
+		}
+		
+		const toast = document.createElement('div');
+		toast.className = `toast ${toastClass}`;
+		toast.innerHTML = `
+			<span class="toast-icon">${icon}</span>
+			<span class="toast-message">${message}</span>
+		`;
+		
+		container.appendChild(toast);
+		
+		setTimeout(() => {
+			toast.classList.add('toast-fadeout');
+			setTimeout(() => {
+				container.removeChild(toast);
+			}, 300);
+		}, 5000);
+	}
+	</script>
+}

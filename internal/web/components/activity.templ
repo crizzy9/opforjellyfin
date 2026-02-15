@@ -1,0 +1,113 @@
+package components
+
+import (
+	"fmt"
+	"opforjellyfin/internal/shared"
+)
+
+templ ActivityPage() {
+	<div class="header">
+		<h1>Activity</h1>
+		<button class="btn" onclick="location.reload()">🔄 Refresh</button>
+	</div>
+
+	<div class="activity-section">
+		<h2 class="section-title">Queue</h2>
+		<div id="activity-list" 
+			hx-get="/api/activity/status" 
+			hx-trigger="load, every 3s"
+			hx-swap="innerHTML">
+			<div class="spinner"></div>
+		</div>
+	</div>
+	
+	@ActivityScript()
+}
+
+templ ActivityList(downloads []*shared.TorrentDownload) {
+	if len(downloads) == 0 {
+		<div class="empty-state">
+			<div class="empty-state-icon">💤</div>
+			<h3>No active downloads</h3>
+			<p>Downloads will appear here automatically when you add them</p>
+		</div>
+	} else {
+		for _, dl := range downloads {
+			<div class="activity-item">
+				<div class="activity-header">
+					<div class="activity-title">
+						<strong>{ dl.Title }</strong>
+						<span class="activity-range">{ dl.ChapterRange }</span>
+					</div>
+					if dl.Imported || dl.Placed {
+						<span class="status-badge status-imported">Imported</span>
+					} else if dl.Done {
+						<span class="status-badge status-downloaded">Downloaded</span>
+					} else {
+						<span class="status-badge status-downloading">Downloading</span>
+					}
+				</div>
+				<div class="activity-progress">
+					<div class="progress-bar-sonarr">
+						<div class="progress-fill-sonarr" style={ fmt.Sprintf("width: %d%%", calculateProgress(dl)) }></div>
+					</div>
+					<div class="progress-info">
+						<span>{ fmt.Sprintf("%d%%", calculateProgress(dl)) }</span>
+						if dl.TotalSize > 0 {
+							<span>{ fmt.Sprintf("%s / %s", formatBytes(dl.Progress), formatBytes(dl.TotalSize)) }</span>
+						}
+					</div>
+				</div>
+				if dl.PlacementProgress != "" {
+					<div class="activity-status">
+						{ dl.PlacementProgress }
+						if len(dl.PlacementFull) > 0 {
+							<span class="files-placed-count">{ fmt.Sprintf("(%d file%s placed)", len(dl.PlacementFull), pluralS(len(dl.PlacementFull))) }</span>
+						}
+					</div>
+				}
+			</div>
+		}
+	}
+}
+
+func calculateProgress(dl *shared.TorrentDownload) int {
+	if dl.TotalSize > 0 {
+		return int(float64(dl.Progress) / float64(dl.TotalSize) * 100)
+	}
+	return 0
+}
+
+func pluralS(count int) string {
+	if count != 1 {
+		return "s"
+	}
+	return ""
+}
+
+// Go template helper function for bytes formatting isn't directly available, 
+// so we'll implement a simple one or rely on JS if needed. 
+// However, templ allows Go code, so let's implement it in Go.
+func formatBytes(bytes int64) string {
+	if bytes == 0 {
+		return "0 B"
+	}
+	const k = 1024
+	sizes := []string{"B", "KB", "MB", "GB", "TB"}
+	
+	i := 0
+	b := float64(bytes)
+	for b >= k && i < len(sizes)-1 {
+		b /= k
+		i++
+	}
+	return fmt.Sprintf("%.2f %s", b, sizes[i])
+}
+
+
+templ ActivityScript() {
+	<script>
+	// We handle the rendering server-side now, so we don't need the client-side render logic.
+	// We might retain some specific interactions if needed.
+	</script>
+}
