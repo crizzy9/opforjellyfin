@@ -117,7 +117,7 @@ func (t *TransmissionClient) GetTorrentStatus(torrentID string) (*TorrentStatus,
 	req := transmissionRequest{
 		Method: "torrent-get",
 		Arguments: map[string]any{
-			"fields": []string{"id", "name", "status", "percentDone", "downloadedEver", "totalSize", "rateDownload", "rateUpload", "downloadDir", "error", "errorString"},
+			"fields": []string{"id", "name", "status", "percentDone", "downloadedEver", "totalSize", "rateDownload", "rateUpload", "downloadDir", "error", "errorString", "files"},
 			"ids":    []string{torrentID},
 		},
 	}
@@ -137,6 +137,17 @@ func (t *TransmissionClient) GetTorrentStatus(torrentID string) (*TorrentStatus,
 	torrent := torrents[0].(map[string]any)
 	percentDone := torrent["percentDone"].(float64)
 
+	var fileNames []string
+	if files, ok := torrent["files"].([]any); ok {
+		for _, f := range files {
+			if fileMap, ok := f.(map[string]any); ok {
+				if name, ok := fileMap["name"].(string); ok {
+					fileNames = append(fileNames, name)
+				}
+			}
+		}
+	}
+
 	status := &TorrentStatus{
 		ID:            fmt.Sprintf("%v", torrent["id"]),
 		Name:          torrent["name"].(string),
@@ -147,6 +158,7 @@ func (t *TransmissionClient) GetTorrentStatus(torrentID string) (*TorrentStatus,
 		UploadSpeed:   int64(torrent["rateUpload"].(float64)),
 		SavePath:      torrent["downloadDir"].(string),
 		IsComplete:    percentDone >= 1.0,
+		Files:         fileNames,
 	}
 
 	if errNum, ok := torrent["error"].(float64); ok && errNum != 0 {

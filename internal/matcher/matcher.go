@@ -38,6 +38,7 @@ func MatchAndPlaceVideo(videoPath, defaultDir string, index *shared.MetadataInde
 	finalPath := dstPathNoSuffix + ext
 
 	// SafeMoveFile now handles all locking internally
+	logger.Log(true, "   🔄 Hardlinking: %s -> %s", videoPath, finalPath)
 	if err := shared.SafeMoveFile(videoPath, finalPath); err != nil {
 		logger.Log(true, "   ❌ Failed to place file to target location: %s", err)
 		return "", fmt.Errorf("failed to place %s to %s: %w", fileName, finalPath, err)
@@ -94,7 +95,7 @@ func DetermineEpisodeTitle(fileName string, index *shared.MetadataIndex, ogcr st
 
 	// 2. Try to extract specific chapter info from the FILENAME first
 	// This fixes the bug where batch torrents all get mapped to the same OGCR episode
-	
+
 	// Try extracting exact chapter/range from filename
 	fileChapterRange := shared.ExtractChapterRangeFromTitle(fileName)
 	var newFileName string
@@ -108,9 +109,9 @@ func DetermineEpisodeTitle(fileName string, index *shared.MetadataIndex, ogcr st
 		}
 	}
 
-	// 3. If filename extraction failed or didn't match an episode in the season, 
+	// 3. If filename extraction failed or didn't match an episode in the season,
 	// try rough extraction from filename
-	
+
 	// Rough extraction logic
 	_, isRange := shared.RoughExtractChapterFromTitle(fileName)
 	if !isRange {
@@ -118,7 +119,7 @@ func DetermineEpisodeTitle(fileName string, index *shared.MetadataIndex, ogcr st
 		seasonZ := shared.ExtractSeasonNumber(seasonFolderName)
 		seasonNum := fmt.Sprintf("%02s", seasonZ)
 		chapterNum, _ := shared.RoughExtractChapterFromTitle(fileName)
-		
+
 		if chapterNum != "" {
 			epKey := fmt.Sprintf("S%sE%s", seasonNum, chapterNum)
 			newFileName = findTitleRough(epKey, seasonIndex)
@@ -140,7 +141,6 @@ func DetermineEpisodeTitle(fileName string, index *shared.MetadataIndex, ogcr st
 
 	return "", ""
 }
-
 
 // exact match, returns title from metadataindex using chapterKey.
 func findTitleForChapter(chapterKey string, sindex shared.SeasonIndex) string {

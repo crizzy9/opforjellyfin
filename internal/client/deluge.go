@@ -113,7 +113,7 @@ func (d *DelugeClient) AddTorrent(ctx context.Context, torrentURL string, savePa
 func (d *DelugeClient) GetTorrentStatus(torrentID string) (*TorrentStatus, error) {
 	req := delugeRequest{
 		Method: "core.get_torrent_status",
-		Params: []any{torrentID, []string{"name", "state", "progress", "total_done", "total_size", "download_payload_rate", "upload_payload_rate", "save_path"}},
+		Params: []any{torrentID, []string{"name", "state", "progress", "total_done", "total_size", "download_payload_rate", "upload_payload_rate", "save_path", "files"}},
 		ID:     1,
 	}
 
@@ -129,6 +129,17 @@ func (d *DelugeClient) GetTorrentStatus(torrentID string) (*TorrentStatus, error
 
 	progress, _ := statusMap["progress"].(float64)
 
+	var fileNames []string
+	if files, ok := statusMap["files"].([]any); ok {
+		for _, f := range files {
+			if fileMap, ok := f.(map[string]any); ok {
+				if path, ok := fileMap["path"].(string); ok {
+					fileNames = append(fileNames, path)
+				}
+			}
+		}
+	}
+
 	return &TorrentStatus{
 		ID:            torrentID,
 		Name:          statusMap["name"].(string),
@@ -140,6 +151,7 @@ func (d *DelugeClient) GetTorrentStatus(torrentID string) (*TorrentStatus, error
 		UploadSpeed:   int64(statusMap["upload_payload_rate"].(float64)),
 		SavePath:      statusMap["save_path"].(string),
 		IsComplete:    progress >= 100,
+		Files:         fileNames,
 	}, nil
 }
 

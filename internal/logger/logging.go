@@ -11,13 +11,14 @@ import (
 )
 
 var (
-	debugEnabled bool
-	debugFile    *os.File
-	debugLogger  *log.Logger // logger used by all
-	logMu        sync.Mutex  // for the log-function
+	debugEnabled   bool
+	verboseEnabled bool
+	debugFile      *os.File
+	debugLogger    *log.Logger // logger used by all
+	logMu          sync.Mutex  // for the log-function
 )
 
-// always enabled
+// EnableDebugLogging writes all log calls to debug.log file.
 func EnableDebugLogging() {
 	debugEnabled = true
 
@@ -31,9 +32,18 @@ func EnableDebugLogging() {
 	debugLogger = log.New(f, "", log.LstdFlags|log.Lshortfile)
 }
 
+// EnableVerboseLogging prints ALL log calls to stdout regardless of showUser flag.
+// Useful for Docker/server environments. Also activated by VERBOSE=true env var.
+func EnableVerboseLogging() {
+	verboseEnabled = true
+}
+
 // threadsafe logger
+// showUser: if true, always print to stdout.
+//
+//	if false, only print to stdout when verboseEnabled.
 func Log(showUser bool, format string, args ...any) {
-	if showUser {
+	if showUser || verboseEnabled {
 		fmt.Printf(format+"\n", args...)
 	}
 

@@ -121,6 +121,173 @@ docker-compose up -d
 
 See [DOCKER.md](DOCKER.md) for complete Docker documentation.
 
+---
+
+## 🚀 Deployment
+
+### 🔐 Verbose Logging (Docker)
+
+To see all internal log messages without rebuilding:
+
+```yaml
+# docker-compose.yml or docker run
+environment:
+  - VERBOSE=true
+```
+
+Or with the CLI flag: `./opfor serve --verbose`
+
+---
+
+### 🐳 Gluetun VPN + OpforJellyfin
+
+Routes all torrent traffic through a VPN container using Gluetun, while keeping the web UI accessible.
+
+```yaml
+networks:
+  servarr:
+    ipam:
+      config:
+        - subnet: 172.155.0.0/24
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      servarr:
+        ipv4_address: 172.155.0.2
+    ports:
+      - 8090:8090       # opforjellyfin web UI
+      - 53334:53334     # torrent port (set FIREWALL_VPN_INPUT_PORTS to match)
+    volumes:
+      - /docker/gluetun:/gluetun
+    environment:
+      - VPN_SERVICE_PROVIDER=airvpn        # or mullvad, protonvpn, etc.
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=<your-key>
+      - WIREGUARD_PRESHARED_KEY=<your-key>
+      - WIREGUARD_ADDRESSES=<vpn-address>
+      - SERVER_COUNTRIES=Canada
+      - FIREWALL_VPN_INPUT_PORTS=53334
+      - FIREWALL_OUTBOUND_SUBNETS=192.168.1.0/24,172.155.0.0/24
+      - HEALTH_VPN_DURATION_INITIAL=120s
+    healthcheck:
+      test: ping -c 1 www.google.com || exit 1
+      interval: 60s
+      timeout: 20s
+      retries: 5
+    restart: unless-stopped
+
+  opforjellyfin:
+    image: ghcr.io/tissla/opforjellyfin:latest
+    container_name: opforjellyfin
+    volumes:
+      - /docker/opforjellyfin:/config
+      - /data:/data
+    environment:
+      - TZ=UTC
+      - VERBOSE=false   # set to true for debug logs
+    command: serve --port 8090
+    network_mode: service:gluetun   # shares gluetun's network stack
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+```
+
+> **Proxmox note**: If running inside an LXC/VM, make sure `/dev/net/tun` is available. Enable it in the container options or with `mknod /dev/net/tun c 10 200`.
+
+---
+
+### 🔀 Traefik Reverse Proxy
+
+Add these labels to gluetun (since it owns the network interface) to expose opforjellyfin through Traefik:
+
+```yaml
+services:
+  gluetun:
+    # ... (existing config above)
+    networks:
+      - servarr
+      - traefik      # must be on the same network Traefik uses
+    labels:
+      - "traefik.enable=true"
+      # Router
+      - "traefik.http.routers.opfor.rule=Host(`opfor.yourdomain.com`)"
+      - "traefik.http.routers.opfor.entrypoints=websecure"
+      - "traefik.http.routers.opfor.tls=true"
+      - "traefik.http.routers.opfor.tls.certresolver=letsencrypt"
+      # Service (points to port 8090 inside gluetun's namespace)
+      - "traefik.http.services.opfor.loadbalancer.server.port=8090"
+      # Optional: add auth middleware (Authelia, Authentik, basicauth, etc.)
+      # - "traefik.http.routers.opfor.middlewares=authelia@docker"
+
+networks:
+  servarr:
+    external: true
+  traefik:
+    external: true    # must already exist and be connected to Traefik
+```
+
+> **Why label gluetun and not opforjellyfin?** Because `opforjellyfin` uses `network_mode: service:gluetun`, it doesn't have its own network namespace — Traefik must route through gluetun.
+
+---
+
+### ❄️ NixOS Homelab
+
+Add to your NixOS flake to deploy opforjellyfin as a proper systemd service:
+
+**`flake.nix`**
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    opforjellyfin.url = "github:tissla/opforjellyfin";
+  };
+
+  outputs = { nixpkgs, opforjellyfin, ... }: {
+    nixosConfigurations.yourhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        opforjellyfin.nixosModules.default
+        ./configuration.nix
+      ];
+    };
+  };
+}
+```
+
+**`configuration.nix`**
+```nix
+{
+  services.opforjellyfin = {
+    enable = true;
+    port = 8090;
+    dataDir = "/var/lib/opforjellyfin";
+    verbose = false;        # set to true to see all logs in journald
+    openFirewall = false;   # set to true to expose locally, use nginx/caddy for external
+  };
+}
+```
+
+Useful commands after enabling:
+```bash
+# Check service status
+systemctl status opforjellyfin
+
+# Follow logs (verbose mode recommended)
+journalctl -fu opforjellyfin
+
+# Rebuild and switch
+nixos-rebuild switch --flake .#yourhost
+```
+
+---
+
 ### 📦 Binary Releases
 
 For this program to work, you need to have 'git' installed.

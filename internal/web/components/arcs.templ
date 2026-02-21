@@ -151,7 +151,7 @@ templ ArcDetails(arc shared.ArcStatus, episodes []shared.EpisodeStatus) {
 			</button>
 			<button class="btn btn-primary" title="Auto-download all available episodes" 
 				onclick={ templ.ComponentScript{ Call: fmt.Sprintf("downloadAllEpisodes('%s', '%s', '%s')", arc.ChapterRange, arc.SeasonKey, arc.Name) } }>
-				⬇️ Download All
+				⚡ Download All
 			</button>
 			if arc.DownloadKey > 0 {
 				<button 
@@ -222,8 +222,8 @@ templ SearchResults(torrents []shared.TorrentEntry) {
 				<div class="search-result-info">
 					<div class="search-result-title">{ t.TorrentName }</div>
 					<div class="search-result-meta">
-						<span>Quality: <strong>{ t.Quality }</strong></span>
-						<span>Audio: <strong>{ t.Audio }</strong></span>
+						<span class="tag tag-quality">{ t.Quality }</span>
+						<span class="tag tag-audio">{ t.Audio }</span>
 						<span>Seeders: <strong>{ strconv.Itoa(t.Seeders) }</strong></span>
 						<span>Range: { t.ChapterRange }</span>
 						<span>Date: { t.Date }</span>

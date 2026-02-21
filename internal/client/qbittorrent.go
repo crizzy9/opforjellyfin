@@ -200,6 +200,21 @@ func (q *QBittorrentClient) GetTorrentStatus(torrentID string) (*TorrentStatus, 
 	upspeed, _ := t["upspeed"].(float64)
 	savePath, _ := t["save_path"].(string)
 
+	// Fetch files
+	filesResp, err := q.client.Get(q.config.URL + "/api/v2/torrents/files?hash=" + torrentID)
+	var fileNames []string
+	if err == nil {
+		defer filesResp.Body.Close()
+		var files []map[string]any
+		if err := json.NewDecoder(filesResp.Body).Decode(&files); err == nil {
+			for _, f := range files {
+				if name, ok := f["name"].(string); ok {
+					fileNames = append(fileNames, name)
+				}
+			}
+		}
+	}
+
 	return &TorrentStatus{
 		ID:            hash,
 		Name:          name,
@@ -211,6 +226,7 @@ func (q *QBittorrentClient) GetTorrentStatus(torrentID string) (*TorrentStatus, 
 		UploadSpeed:   int64(upspeed),
 		SavePath:      savePath,
 		IsComplete:    progress >= 1.0,
+		Files:         fileNames,
 	}, nil
 }
 

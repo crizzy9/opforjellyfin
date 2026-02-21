@@ -11,6 +11,7 @@ type Config struct {
 	Source        ScraperConfig       `json:"source"`
 	TorrentClient TorrentClientConfig `json:"torrent_client"`
 	SubDubMode    string              `json:"sub_dub_mode"` // "All", "Sub", "Dub", "Dual"
+	Resolution    string              `json:"resolution"`   // "1080p", "720p", "All"
 }
 
 type ArcStatus struct {

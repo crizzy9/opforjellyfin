@@ -12,6 +12,7 @@ var defaultCfg = Config{
 	TargetDir:  "",
 	GitHubRepo: "tissla/one-pace-jellyfin",
 	SubDubMode: "All",
+	Resolution: "1080p",
 }
 
 // loads config-file file, creates it if it does not exist

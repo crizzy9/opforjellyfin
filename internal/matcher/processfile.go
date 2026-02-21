@@ -10,41 +10,70 @@ import (
 )
 
 // walks through downloaded files and tries to place them in correct dir
-func ProcessTorrentFiles(tmpDir, outDir string, td *shared.TorrentDownload, index *shared.MetadataIndex) {
+func ProcessTorrentFiles(tmpDir, outDir string, td *shared.TorrentDownload, index *shared.MetadataIndex, files []string) {
 	filesChecked := 0
 	filesPlaced := 0
 	var lastError error
 
 	// collect all paths
 	td.PlacementProgress = fmt.Sprintf("🔧 Finding files to place in %s", tmpDir)
-	logger.Log(true, "🔍 Scanning directory for video files: %s", tmpDir)
 
 	var vidPaths []string
-	err := filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+
+	if len(files) > 0 {
+		logger.Log(true, "📋 Using provided file list for import (%d files)", len(files))
+		for _, f := range files {
+			// Sanitize file path to prevent directory traversal
+			cleanPath := filepath.Clean(f)
+			if strings.Contains(cleanPath, "..") {
+				continue
+			}
+
+			fullPath := filepath.Join(tmpDir, cleanPath)
+			info, err := os.Stat(fullPath)
+			if err != nil {
+				// File might be in a subdirectory that we need to find, but typically torrent clients return relative paths
+				// If strictly not found, skip
+				continue
+			}
+			if info.IsDir() {
+				continue
+			}
+
+			ext := strings.ToLower(filepath.Ext(info.Name()))
+			if ext == ".mkv" || ext == ".mp4" {
+				logger.Log(true, "   ✅ Found video file from list: %s", info.Name())
+				vidPaths = append(vidPaths, fullPath)
+			}
+		}
+	} else {
+		logger.Log(true, "⚠️ No file list provided, scanning directory: %s", tmpDir)
+		err := filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				logger.Log(true, "❌ Failed walking file: %v", err)
+				return nil
+			}
+			if info.IsDir() {
+				logger.Log(false, "   📁 Directory: %s", info.Name())
+				return nil
+			}
+
+			ext := strings.ToLower(filepath.Ext(info.Name()))
+			if ext != ".mkv" && ext != ".mp4" {
+				logger.Log(false, "   ⏭️  Skipping non-video file: %s", info.Name())
+				return nil
+			}
+
+			logger.Log(true, "   ✅ Found video file: %s (%.2f MB)", info.Name(), float64(info.Size())/(1024*1024))
+			vidPaths = append(vidPaths, path)
+			return nil
+		})
+
 		if err != nil {
-			logger.Log(true, "❌ Failed walking file: %v", err)
-			return nil
+			logger.Log(true, "❌ Error walking tmpDir %s: %v", tmpDir, err)
+			td.MarkPlaced(fmt.Sprintf("❌ Error scanning directory: %v", err))
+			return
 		}
-		if info.IsDir() {
-			logger.Log(false, "   📁 Directory: %s", info.Name())
-			return nil
-		}
-
-		ext := strings.ToLower(filepath.Ext(info.Name()))
-		if ext != ".mkv" && ext != ".mp4" {
-			logger.Log(false, "   ⏭️  Skipping non-video file: %s", info.Name())
-			return nil
-		}
-
-		logger.Log(true, "   ✅ Found video file: %s (%.2f MB)", info.Name(), float64(info.Size())/(1024*1024))
-		vidPaths = append(vidPaths, path)
-		return nil
-	})
-
-	if err != nil {
-		logger.Log(true, "❌ Error walking tmpDir %s: %v", tmpDir, err)
-		td.MarkPlaced(fmt.Sprintf("❌ Error scanning directory: %v", err))
-		return
 	}
 
 	// Handle case where no video files found

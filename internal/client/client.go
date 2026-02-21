@@ -30,6 +30,7 @@ type TorrentStatus struct {
 	SavePath      string
 	Error         string
 	IsComplete    bool
+	Files         []string
 }
 
 type ClientInfo struct {

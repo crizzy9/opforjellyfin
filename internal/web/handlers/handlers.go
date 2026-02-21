@@ -72,7 +72,6 @@ func HandleSystem(w http.ResponseWriter, r *http.Request) {
 	c.Render(r.Context(), w)
 }
 
-
 func APIListArcs(w http.ResponseWriter, r *http.Request) {
 	forceRefresh := r.URL.Query().Get("refresh") == "true"
 
@@ -276,28 +275,37 @@ func APISearchArcs(w http.ResponseWriter, r *http.Request) {
 	for _, t := range torrents {
 		// Filter by Sub/Dub mode if set
 		if cfg.SubDubMode != "" && cfg.SubDubMode != "All" {
-             // If mode is "Sub", allow "Sub" and "Dual"
-             // If mode is "Dub", allow "Dub" and "Dual"
-             // If mode is "Dual", allow only "Dual"
-             
-             // However, t.Audio might rely on simple string matching. 
-             // Let's use the parsed Audio field.
-             
-             mode := cfg.SubDubMode
-             audio := t.Audio
-             
-             match := false
-             if mode == "Sub" && (audio == "Sub" || audio == "Dual") {
-                 match = true
-             } else if mode == "Dub" && (audio == "Dub" || audio == "Dual") {
-                 match = true
-             } else if mode == "Dual" && audio == "Dual" {
-                 match = true
-             }
-             
-             if !match {
-                 continue
-             }
+			// If mode is "Sub", allow "Sub" and "Dual"
+			// If mode is "Dub", allow "Dub" and "Dual"
+			// If mode is "Dual", allow only "Dual"
+
+			// However, t.Audio might rely on simple string matching.
+			// Let's use the parsed Audio field.
+
+			mode := cfg.SubDubMode
+			audio := t.Audio
+
+			match := false
+			if mode == "Sub" && (audio == "Sub" || audio == "Dual") {
+				match = true
+			} else if mode == "Dub" && (audio == "Dub" || audio == "Dual") {
+				match = true
+			} else if mode == "Dual" && audio == "Dual" {
+				match = true
+			}
+
+			if !match {
+				continue
+			}
+		}
+
+		// Filter by Resolution if set
+		if cfg.Resolution != "" && cfg.Resolution != "All" {
+			// Extract resolution from quality string (e.g. "1080p")
+			quality := t.Quality
+			if quality != cfg.Resolution {
+				continue
+			}
 		}
 
 		// Match exact chapter range or if the search range is contained within the torrent's range
@@ -623,8 +631,12 @@ func APIUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.SubDubMode = subDubMode
 	}
 
+	if resolution := r.FormValue("resolution"); resolution != "" {
+		cfg.Resolution = resolution
+	}
+
 	shared.SaveConfig(cfg)
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprintf(w, `<div class="alert alert-success">✅ Settings updated successfully</div>`)
 }

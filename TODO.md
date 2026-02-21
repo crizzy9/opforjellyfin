@@ -6,6 +6,18 @@ There are some major issues in the opforjellyfin repository that need to be addr
 - Currently in the UI there is no option for sub and dub based downloads. Lets add a new settings option for this at the global level and make sure we always adhere to it. When doing a search it should show if its a sub or dub based download and allow the user to filter based on it, along with the quality of the video 720p 1080p etc
 
 
+Looks like there is still a bunch of problems here
+- import is still broken. it downloads the right episode but doesnt import the right video in its place in the actual library. It took a video i had in the download folder earlier and linked that to the first episode and then all the other episodes were also linked to the same episode not the actual one that was downloaded. Can you please do a deep dive on this. The whole thing needs to be revamped. Please show me exactly how this import works, how it differs for different scenarios like download arc vs download a single episode vs download multiple episode. How do you retrieve the save path location for the hardlinking of the episode from the download directory to the One Pace season library directory
+- A log of things broken after gotempl modal not working. needs to show if sub/dub and resolution in the modal popup. Also change the icons for auto search and interactive search like sonarr
+- a similar setting for resolution preference should be added (or just default to highest resolution/1080p)
+- Main arc page not working sometimes.
+- Activity needs to show number done and a history with logs of where it copied and what all it did. esentiially allowing you to edit the metadata as you please if required (this is for future)
+- should allow editing failed imports as well
+- improve logging. add explicit logging for all main tasks. like imported, downloaded, torrent link, save path, hardlinked etc all the logs i need in docker
+
+In addition to this i need to have a way to deploy this using my flake.nix on a nixos machine. Allow it to be configurable in a nix homelab environment. Additionally lets add a template to wrap this service with a gluetun vpn tunnel and reverse proxy it with traefik in the readme for clarity of implementation
+
+
 ## TODO
 
 - [-] Add options for Sub and Dub w/o sub for downloads as settings for search
@@ -28,8 +40,8 @@ There are some major issues in the opforjellyfin repository that need to be addr
   - [x] Font change
   - [x] Show clickable items with an underscore like a href
   - [x] Show Season number in the arcs list and sort by season
-  - [ ] fix double download status in activity
-  - [ ] show importing after done dont just say ready to organize (statusing is not proper)
+  - [x] fix double download status in activity
+  - [x] show importing after done dont just say ready to organize (statusing is not proper)
   - [ ] better feedback while clicking things
   - [ ] update toast timeout to 15s and make them dismissable
   - [ ] Log Viewing

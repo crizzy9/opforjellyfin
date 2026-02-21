@@ -119,7 +119,7 @@ func ImportCompletedDownload(td *shared.TorrentDownload, status *client.TorrentS
 	}
 
 	// Process the files and check if any were placed
-	matcher.ProcessTorrentFiles(status.SavePath, cfg.TargetDir, td, index)
+	matcher.ProcessTorrentFiles(status.SavePath, cfg.TargetDir, td, index, status.Files)
 
 	// Only mark as imported and placed if files were actually placed
 	if len(td.PlacementFull) > 0 {

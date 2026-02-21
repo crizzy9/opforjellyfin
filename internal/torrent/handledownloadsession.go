@@ -103,7 +103,7 @@ func HandleDownloadSession(entries []shared.TorrentEntry, outDir string) {
 
 					// Place immediately after download completes
 					tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("opfor-tmp-%d", td.TorrentID))
-					matcher.ProcessTorrentFiles(tmpDir, outDir, td, metadataIndex)
+					matcher.ProcessTorrentFiles(tmpDir, outDir, td, metadataIndex, nil)
 
 					// Clean up temp directory immediately
 					if err := os.RemoveAll(tmpDir); err != nil {
